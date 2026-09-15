@@ -1,0 +1,45 @@
+wordmark: deepgram
+title: Deepgram Flux TTS for Home Assistant
+eyebrow: home assistant custom integration
+lede: >-
+  A Home Assistant custom integration that makes Deepgram Flux TTS the voice of a Home Assistant
+  voice assistant. Start at HANDOFF.md, then the interface contract, then the build ledger.
+
+# No asana key yet. project-hub init's Asana step is outward facing and creates a team visible
+# project plus four tasks, one of which needs a check-back date only Sam can pick. Queued for
+# him rather than guessed. Everything else in .hub/ is complete and working without it.
+
+# No public_repo key. This project has not flipped, so every tile here is internal.
+# Flip target when it does: samgutentag-deepgram/ha-deepgram-tts
+
+reference:
+  Deepgram:
+    - name: 📘 Flux TTS docs
+      url: https://developers.deepgram.com/docs/flux-tts
+      desc: The websocket and batch endpoints this integration targets. Docs are thinner than HANDOFF section 3.
+    - name: 🎙️ Voice catalog, Flux
+      url: https://api.deepgram.com/v2/models
+      desc: Public, no auth. 36 voices, all English, all architecture flux-tts.
+    - name: 🎙️ Voice catalog, Aura
+      url: https://api.deepgram.com/v1/models
+      desc: Public, no auth. 102 TTS entries, 90 aura-2 plus 12 legacy aura. Zero Flux.
+    - name: 🔑 Deepgram console
+      url: https://console.deepgram.com
+      desc: Where the API key comes from. There is no key on this machine yet.
+  Home Assistant:
+    - name: 📗 TTS entity docs
+      url: https://developers.home-assistant.io/docs/core/entity/text-to-speech
+      desc: The contract in HANDOFF section 4.2. async_supports_streaming_input auto-detects.
+    - name: 🏠 Assist pipelines
+      url: https://www.home-assistant.io/voice_control/
+      desc: Where a TTS entity actually gets used, and why the streaming path matters.
+    - name: 📦 HACS custom repositories
+      url: https://www.hacs.xyz/docs/faq/custom_repositories/
+      desc: The distribution path. hacs.json sets the 2026.9.0 floor.
+    - name: 🔊 Voice Preview Edition
+      url: https://www.home-assistant.io/voice-pe/
+      desc: The reference voice hardware. See the bill of materials for whether it is the right buy.
+  Prior art:
+    - name: 🔀 alceasan/ha-deepgram-tts
+      url: https://github.com/alceasan/ha-deepgram-tts
+      desc: The community integration this replaces. Credited, not forked. Its defects are HANDOFF section 2.2.
