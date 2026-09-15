@@ -189,3 +189,68 @@ a public snapshot later. Its home is `~/Developer/gutils/templates/` next to the
 reads, which is a two minute move whenever that is wanted.
 Source: scratchpad `render_md.py` · docs/superpowers/interface-contract.html
 Routes to: a gutils commit, and the open questions list
+
+### [surprise] display_name is null for 61 of the 102 Aura voices, not missing
+Expected: `metadata.display_name` present on every catalog entry, with a missing key as the rare
+defensive case. Actual: the key is present with a **null value** on 49 `aura-2` entries plus all
+12 legacy `aura` entries. 61 of 102.
+Why it matters more than it looks: `"display_name" in metadata` passes, so the obvious guard
+does nothing and `None` lands in the voice picker. Every one of the 36 Flux voices has a real
+display name, so testing only the Flux path finds nothing wrong. The fallback to a title-cased
+`name` is the **normal** path for most of the Aura list, not an edge case, which changes what a
+good picker label looks like and which voices are worth testing.
+Fixed by treating null, empty, and whitespace as absent rather than checking for the key.
+Source: custom_components/deepgram_tts/catalog.py `_optional_string` · live `/v1/models`
+Routes to: chapter 4's picker labels, chapter 5's Voice list, technical blog post
+
+### [claim] 138 voices merge with zero key collisions, and seven languages come out
+Live run of the real parser over the real payloads: 138 merged voices, zero collisions on
+`canonical_name`, and `supported_languages` of `de, en, es, fr, it, ja, nl`. Base codes only,
+no `en-US` leaking in. With no preference, English resolves to `flux-haley-en` and the six
+non-English bases resolve to `aura-2-agustina-es`, `aura-2-aurelia-de`, `aura-2-agathe-fr`,
+`aura-2-beatrix-nl`, `aura-2-cesare-it`, and `aura-2-ama-ja`.
+It held. Settled decision 4 is now demonstrated against the live catalog and not only in tests:
+no non-English language can reach a Flux voice, because there is no Flux voice that claims one.
+Source: chapter 3 agent's live parser run · tests/test_catalog.py, the six-language parametrize
+Routes to: technical blog post, user-facing post, the language section of both
+
+### [decision] resolve_voice grew a last resort, guarded on the language and not on the family
+The contract's ladder was: the preferred voice, then the default for English, then the first
+Aura voice for that language. That returns `None` for an English pipeline in the case where the
+catalog has no Aura English voice, despite 36 usable Flux voices sitting right there.
+Added a final step: the first voice of any family, **guarded on the base language code being
+English**. The guard is on the language, deliberately, not on the voice's family. If Deepgram
+ever ships a Flux voice mislabeled with a non-English language, a family-guarded fallback would
+hand it to a Spanish pipeline and a language-guarded one will not. Settled decision 4 survives
+a catalog that is wrong about itself.
+Source: custom_components/deepgram_tts/catalog.py `resolve_voice`
+Routes to: a contract revision, technical blog post
+
+### [surprise] /v1/models is 183 KB and 445 of its entries are models we discard
+Both catalogs are fetched at every config entry setup. `/v2/models` is 22 KB. `/v1/models` is
+183 KB, of which 445 entries are `stt` models this integration throws away to get at 102 `tts`
+entries. 205 KB per setup, with `TIMEOUT_CATALOG` at 15 seconds.
+Not a problem on a laptop. Untested on a Raspberry Pi on wifi, which is the target hardware, and
+a setup that times out is a `ConfigEntryNotReady` retry loop rather than a clean failure. Worth
+measuring on the real instance before deciding whether it needs a cache.
+Noted rather than fixed: adding a cache before measuring would be guessing, and the fix if it is
+needed is small.
+Source: docs/chapter-3-notes.md · live payload sizes
+Routes to: the real-hardware checklist, and chapter 7 if the measurement says so
+
+### [decision] Chapter 6 gets built on a branch and is not merged, because the trap is real
+HANDOFF section 6 gates chapter 6 on chapter 5 running on real hardware. That gate cannot be
+satisfied today: no API key, no access to the instance, and no speaker in the house.
+The gate is not procedural. From section 2.1: `async_supports_streaming_input()` auto-detects
+streaming by comparing `self.__class__.async_stream_tts_audio` against the base method, so
+**defining the method is the opt-in and there is no flag.** The moment it exists, every Assist
+pipeline response routes down it while direct `tts.speak` calls keep working. An unverified
+streaming path does not sit inert next to a working batch path, it replaces it for the exact use
+case this integration exists for, and only in the place nobody tests by hand.
+So: main stops at chapter 5 and stays deployable. Chapter 6 is built fully, on its own branch,
+with `stream.py` unit tested against a mocked socket, and merged after
+`scripts/measure_first_frame.py` has produced a number on real hardware. Chapter 5's test suite
+asserts `async_supports_streaming_input()` is False, so that assertion failing is the signal
+that chapter 6 arrived and the merge is a deliberate act.
+Source: HANDOFF.md section 2.1 · tests/test_tts.py, the streaming guard assertion
+Routes to: technical blog post, and this is probably the post's strongest single section
