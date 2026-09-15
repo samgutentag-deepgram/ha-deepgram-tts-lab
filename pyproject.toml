@@ -9,7 +9,10 @@ target-version = "py314"
 line-length = 100
 src = ["custom_components", "tests"]
 # ruff formats python blocks inside markdown; HANDOFF.md is prose and stays as written.
-extend-exclude = ["*.md", ".venv"]
+# docs/review/repro holds throwaway reproduction scripts kept as review evidence. They are run
+# by hand, never imported, and are deliberately left as they were when they produced their
+# output, so linting them would mean editing evidence.
+extend-exclude = ["*.md", ".venv", "docs/review"]
 
 [tool.ruff.lint]
 select = [
