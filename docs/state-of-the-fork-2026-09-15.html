@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ha-deepgram-tts: state of the fork</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.6rem; }
+  td.ok, td.warn, td.bad { font-family: system-ui, sans-serif; font-size: 0.88rem; white-space: nowrap; }
+  td.ok::before { content: "\2022  "; color: var(--faint); }
+  td.warn::before { content: "\25B2  "; color: var(--accent); }
+  td.bad::before { content: "\2716  "; color: var(--accent); font-weight: 700; }
+  td.bad { font-weight: 700; }
+  table th:first-child, table td:first-child { width: 26%; }
+  h3 { color: var(--muted2); }
+  ol, ul { padding-left: 1.4rem; }
+  li { margin-bottom: 0.35rem; }
+
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<h1>ha-deepgram-tts: state of the fork</h1>
+<p class="subtitle">Audit of the forked <code>alceasan/ha-deepgram-tts</code> integration, September 15 2026. Last upstream commit: January 12 2026 (8 months cold). Scope: will it still run on current Home Assistant, and what does moving to Flux TTS actually take.</p>
+
+<h2>Verdict</h2>
+
+<p>It will almost certainly not load on a current Home Assistant, and even if it loads, the streaming path that Assist prefers is guaranteed to fail. Both failures come from the same root cause: the integration declares <code>"requirements": []</code> in its manifest while importing two packages it does not own.</p>
+
+<table>
+  <tr><th>Path</th><th>Status</th><th>Why</th></tr>
+  <tr><td>Integration load</td><td class="bad">Broken (high confidence)</td><td><code>import async_timeout</code> in <code>api.py</code> and <code>api_models.py</code>. Not in HA core requirements, and aiohttp dropped it as a dependency at 3.10 (HA is on 3.14.3). Nothing installs it.</td></tr>
+  <tr><td>Streaming TTS</td><td class="bad">Broken (certain)</td><td><code>stream_processor.py</code> raises <code>RuntimeError("pydub is not available")</code> when <code>AudioSegment</code> is None. pydub is not an HA dependency and is not declared, so it is never installed.</td></tr>
+  <tr><td>One-shot <code>tts.speak</code></td><td class="ok">Fine, if it loads</td><td><code>async_get_tts_audio</code> does a plain POST to <code>/v1/speak</code> and never touches pydub.</td></tr>
+  <tr><td>Config flow</td><td class="warn">Works, looks rough</td><td>The <code>/v1/models</code> catalog is still live and public (verified HTTP 200 with no auth). But there is no <code>strings.json</code>, so the UI renders raw step ids.</td></tr>
+  <tr><td>Aura-2 API surface</td><td class="ok">Unchanged</td><td>102 TTS models still served from <code>/v1/speak</code>. No deprecation signal.</td></tr>
+</table>
+
+<p>The important part: because <code>async_stream_tts_audio</code> is overridden, HA auto-detects streaming support (<code>async_supports_streaming_input</code> compares the subclass method against the base method) and routes Assist pipeline responses down the broken path. So the failure mode is not "streaming is a bit worse." It is "voice assistant responses raise, one-shot service calls work."</p>
+
+<h2>Environment drift</h2>
+
+<table>
+  <tr><th>Thing</th><th>Repo assumes</th><th>Reality today</th></tr>
+  <tr><td>Home Assistant</td><td><code>hacs.json</code>: 2025.7.0 minimum</td><td>2026.9.x stable, 2026.10.0.dev0 in dev</td></tr>
+  <tr><td>Python</td><td>README: 3.11+</td><td>HA dev pins <code>requires-python = "&gt;=3.14.2"</code></td></tr>
+  <tr><td><code>async_timeout</code></td><td>Imported, undeclared</td><td>Gone from HA core requirements</td></tr>
+  <tr><td><code>pydub</code></td><td>Imported, undeclared</td><td>Not an HA dependency. Also needs <code>audioop-lts</code> on Python 3.13+, which HA does ship (0.2.2)</td></tr>
+  <tr><td><code>slugify</code></td><td>Imported in <code>config_flow.py</code></td><td>Available via <code>python-slugify</code>, but the import is unused</td></tr>
+  <tr><td>Dev pins</td><td><code>pytest-homeassistant-custom-component==0.13.89</code>, black, flake8</td><td>Years stale. HA core standardized on ruff</td></tr>
+  <tr><td>Releases</td><td><code>manifest.json</code> says 1.0.2</td><td>Zero git tags, so HACS has no release to resolve and falls back to the branch</td></tr>
+  <tr><td>Devcontainer</td><td><code>.devcontainer.json</code> builds from <code>Dockerfile</code></td><td>No Dockerfile in the repo. Devcontainer cannot build</td></tr>
+  <tr><td>Tests</td><td><code>requirements.txt</code> installs pytest</td><td>No <code>tests/</code> directory exists</td></tr>
+</table>
+
+<h2>Code findings</h2>
+
+<h3>Blockers</h3>
+<ol>
+  <li><strong>Undeclared runtime dependencies.</strong> <code>manifest.json</code> has <code>"requirements": []</code> while the code imports <code>async_timeout</code> and <code>pydub</code>. Fix by deleting both: <code>async_timeout.timeout(n)</code> becomes <code>asyncio.timeout(n)</code> (stdlib since 3.11), and pydub goes away entirely once the streaming rewrite lands.</li>
+  <li><strong>Setup failure is not retryable.</strong> <code>async_setup_entry</code> awaits <code>models_client.fetch_models()</code> and lets a raw aiohttp error escape. That marks the entry failed with no retry. It should raise <code>ConfigEntryNotReady</code>, which is exactly the case this exception exists for.</li>
+  <li><strong>Streaming does not stream.</strong> <code>tts.py</code> builds a <code>message_gen()</code> that accumulates every chunk from <code>request.message_gen</code> into one string, then yields it once. The whole LLM response is buffered before the first synthesis call, which deletes the entire latency benefit of the 2025.7 streaming API that the README advertises.</li>
+</ol>
+
+<h3>Correctness and cost</h3>
+<ol>
+  <li><strong>Request body may be wrong.</strong> <code>api.py</code> sends <code>Content-Type: text/plain</code> with a raw UTF-8 body. The <code>/v1/speak</code> reference specifies <code>application/json</code> with <code>{"text": "..."}</code>. This is a plausible cause of the "400 Bad Request" the 1.0.1 changelog claims to have fixed by other means. Unverified: auth is checked before body parsing, so it cannot be probed without a real key.</li>
+  <li><strong>Decode then re-encode for nothing.</strong> <code>async_process_stream</code> takes each MP3 fragment from Deepgram, decodes it with pydub, and re-exports it as MP3 before yielding. That is a full transcode per sentence on a Raspberry Pi for zero benefit. HA already runs ffmpeg conversion in <code>_async_convert_audio</code> when the requested <code>preferred_format</code> differs from what the entity returns.</li>
+  <li><strong>Buffer threshold explodes.</strong> <code>min_len = 2 ** count * 10</code> in <code>_sentence_generator</code>, where <code>count</code> increments per input chunk. By chunk 20 the threshold is 10 megabytes. It happens to be harmless today only because <code>message_gen()</code> yields exactly one chunk.</li>
+  <li><strong>Sentence splitter is naive.</strong> <code>_find_sentence</code> splits on <code>(?&lt;!\d)[.!?]</code>, so "Dr." and "3 p.m." each become a separate synthesis request, each with its own network round trip and its own audio boundary click.</li>
+  <li><strong>Single-instance lock.</strong> <code>async_set_unique_id("deepgram_tts")</code> is a hardcoded constant, so you can never configure a second entry, for example one entity on Flux and one on Aura-2 for comparison.</li>
+</ol>
+
+<h3>Polish and hygiene</h3>
+<ol>
+  <li><strong>Leftover blueprint scaffolding.</strong> <code>api.py</code> defines <code>_verify_response_or_raise</code> twice (the second silently wins) plus three dead <code>IntegrationBlueprintApiClient*</code> exception classes. <code>const.py</code> and <code>__init__.py</code> docstrings still describe <code>integration_blueprint</code>.</li>
+  <li><strong>No translations.</strong> No <code>strings.json</code> and no <code>translations/</code>, so the config and options flows show bare step ids with no labels or descriptions.</li>
+  <li><strong>Private attribute poking.</strong> <code>__init__.py</code> sets <code>client._models_cache</code> from outside the class, and <code>tts.py</code> reads it back through <code>getattr</code> and through <code>self._processor._client._models_cache</code>. Make it a constructor argument.</li>
+  <li><strong>Options flow <code>__init__</code> is dead weight.</strong> <code>DeepgramTTSOptionsFlowHandler.__init__</code> accepts <code>config_entry</code> and does <code>pass</code>. This accidentally dodges the 2025.12 breaking change (which fires when you <em>assign</em> <code>self.config_entry</code>), but delete the override anyway so the intent is clear.</li>
+  <li><strong>Unused imports and mixed-language comments.</strong> <code>timedelta</code> and <code>DeepgramTtsEntity</code> in <code>__init__.py</code>, <code>re</code> in <code>tts.py</code>, <code>slugify</code> in <code>config_flow.py</code>. Roughly a dozen Spanish inline comments throughout, which is fine to keep but worth normalizing if this becomes your fork.</li>
+</ol>
+
+<h3>Metadata that still points upstream</h3>
+<p><code>manifest.json</code> lists <code>@alceasan</code> as codeowner and <code>github.com/alceasan/ha-deepgram-tts/issues</code> as the issue tracker. The README's HACS instructions have a typo (<code>alceasan/ha-deemgram-tts</code>). The CHANGELOG dates do not match the git history: 1.0.2 is dated 2026-08-01 but was committed 2026-01-08, and 1.0.1 is dated 2025-01-10 but was committed 2025-10-01.</p>
+
+<h2>Moving to Flux TTS</h2>
+
+<p>This is a bigger change than swapping a model string. Flux TTS is a different endpoint with a different protocol, and the two families do not mix.</p>
+
+<h3>What is verified live</h3>
+<table>
+  <tr><th>Fact</th><th>Detail</th></tr>
+  <tr><td>Endpoints</td><td><code>POST https://api.deepgram.com/v2/speak</code> (batch), <code>wss://api.deepgram.com/v2/speak</code> (streaming)</td></tr>
+  <tr><td>Hard family split</td><td>Posting an Aura model to <code>/v2/speak</code> returns <code>V1_MODEL_ON_V2_SPEAK_ENDPOINT</code>, HTTP 400, checked <em>before</em> auth. Aura stays on <code>/v1/speak</code></td></tr>
+  <tr><td>Voice catalog</td><td><code>GET /v2/models</code> is public and unauthenticated, and returns exactly 36 <code>flux-tts</code> voices. <code>/v1/models</code> contains zero Flux entries</td></tr>
+  <tr><td>Query params</td><td><code>model</code>, <code>encoding</code>, <code>container</code>, <code>sample_rate</code>, <code>speed</code>, <code>bit_rate</code>, <code>mip_opt_out</code>, <code>callback</code>. Unknown params are rejected outright</td></tr>
+  <tr><td><code>encoding</code> values</td><td><code>linear16</code>, <code>mulaw</code>, <code>alaw</code>, <code>mp3</code>, <code>opus</code>, <code>flac</code>, <code>aac</code>. Default is <code>mp3</code></td></tr>
+  <tr><td><code>container</code> values</td><td><code>wav</code>, <code>ogg</code>, <code>none</code></td></tr>
+  <tr><td>Transport limits</td><td>Compressed and containerized encodings are batch-only. The socket emits raw <code>linear16</code>, <code>mulaw</code>, or <code>alaw</code></td></tr>
+  <tr><td>Body shape</td><td><code>Content-Type: application/json</code>, <code>{"text": "..."}</code></td></tr>
+</table>
+
+<h3>The one real regression</h3>
+<p>Every Flux voice is English (<code>en</code>, <code>en-US</code>). Aura-2 covers seven languages (en, es, de, fr, nl, it, ja). If you go Flux-only, <code>supported_languages</code> collapses to <code>["en"]</code> and any non-English Assist pipeline loses its voice. That argues for keeping both families and routing on the model prefix rather than replacing Aura outright.</p>
+
+<h3>Why the WebSocket path is the actual prize</h3>
+<p>Flux TTS maps onto HA's streaming TTS API almost one to one, and in doing so deletes most of this repo's complexity.</p>
+
+<p>Client messages: <code>Speak</code> (<code>{"type":"Speak","text":"..."}</code>), <code>Flush</code>, <code>Interrupt</code> (with an optional <code>playback_offset</code>), <code>Configure</code> (<code>speed</code>, 0.5 to 1.5 in 0.05 steps), <code>Close</code>.</p>
+
+<p>Server messages: <code>Connected</code>, <code>SpeechStarted</code>, <code>SpeechMetadata</code>, <code>SpeechInterrupted</code>, <code>Flushed</code>, <code>SessionMetadata</code>, <code>ConfigureSuccess</code>, <code>ConfigureFailure</code>, <code>Warning</code>, <code>Error</code>. Every audio frame for a turn arrives between <code>SpeechStarted</code> and <code>SpeechMetadata</code>.</p>
+
+<p>So <code>async_stream_tts_audio</code> becomes: open the socket, forward each chunk of <code>request.message_gen</code> as a <code>Speak</code>, send <code>Flush</code> when the generator is exhausted, and yield binary frames until <code>SpeechMetadata</code> arrives. The server decides where the flush boundaries go, which means <strong><code>stream_processor.py</code> deletes entirely</strong>: no sentence regex, no pydub, no MP3 fragment concatenation, no 150 ms synthesis delay, no per-sentence round trips. That file is 206 lines of workaround for a problem the v2 API does not have.</p>
+
+<p>Two mechanical details worth settling before you write code. First, the socket returns raw PCM with no container, so the entity should either prepend a WAV header and report <code>extension="wav"</code>, or advertise <code>ATTR_PREFERRED_FORMAT</code> in <code>supported_options</code> and let HA's ffmpeg conversion handle it. Second, <code>SpeechInterrupted</code> carries <code>text_spoken</code> and <code>text_remaining</code>, which is the right primitive for Assist barge-in, but HA's TTS entity API has no barge-in hook today. Treat it as a later win, not a day-one requirement.</p>
+
+<blockquote>
+<p>Engineering note on voice choice, not a gate: <code>flux-marcus-en</code> and <code>flux-brittany-en</code> drift in pitch and volume between calls, sometimes emit an audible musical note before a greeting, and can click at clip starts. Relevant only if you pick one as the shipped default, since a home assistant makes many short separate calls and the drift is most audible exactly there.</p>
+</blockquote>
+
+<h2>Recommended order of work</h2>
+
+<h3>Phase 0: unbreak it (about 30 minutes)</h3>
+<ol>
+  <li>Replace <code>async_timeout.timeout()</code> with <code>asyncio.timeout()</code> in <code>api.py</code> and <code>api_models.py</code>.</li>
+  <li>Delete the pydub import and <code>_trim_end_of_audio</code>, and stop re-encoding in <code>async_process_stream</code>. Pass fragments through untouched.</li>
+  <li>Wrap the <code>fetch_models()</code> call in <code>async_setup_entry</code> and raise <code>ConfigEntryNotReady</code>.</li>
+  <li>Switch <code>/v1/speak</code> to <code>application/json</code> with a <code>{"text": ...}</code> body.</li>
+  <li>Bump <code>hacs.json</code> to a current minimum, retarget codeowner and issue tracker at your fork, and cut a <code>v1.1.0</code> tag so HACS has a release.</li>
+</ol>
+<p>After this it should load and both paths should work. This is the point to install on your instance and confirm before building anything new.</p>
+
+<h3>Phase 1: Flux on the batch endpoint (2 to 3 hours)</h3>
+<ol>
+  <li>Merge the two catalogs: <code>/v1/models</code> for Aura, <code>/v2/models</code> for Flux, into one voice list.</li>
+  <li>Route by model prefix in the API client: <code>flux-*</code> to <code>/v2/speak</code>, everything else to <code>/v1/speak</code>.</li>
+  <li>Use <code>metadata.display_name</code> for the <code>Voice</code> label instead of <code>name</code>, which is the bare lowercase given name.</li>
+  <li>Add a <code>speed</code> option, since Flux exposes it and Aura does not.</li>
+  <li>Add <code>async_migrate_entry</code> and bump the config flow <code>VERSION</code>, because the stored voice id shape is about to change.</li>
+</ol>
+
+<h3>Phase 2: the WebSocket rewrite (4 to 6 hours)</h3>
+<ol>
+  <li>Implement the socket client against the <code>Speak</code> / <code>Flush</code> / <code>SpeechStarted</code> / <code>SpeechMetadata</code> lifecycle.</li>
+  <li>Rewrite <code>async_stream_tts_audio</code> to forward <code>request.message_gen</code> chunk by chunk instead of buffering it.</li>
+  <li>Delete <code>stream_processor.py</code>.</li>
+  <li>Settle the container question: WAV header plus <code>extension="wav"</code>, or <code>ATTR_PREFERRED_FORMAT</code> passthrough.</li>
+  <li>Fall back to the batch endpoint when the socket fails, so a dropped connection degrades instead of erroring.</li>
+</ol>
+
+<h3>Phase 3: hygiene (1 to 2 hours)</h3>
+<ol>
+  <li>Add <code>strings.json</code> and <code>translations/en.json</code>.</li>
+  <li>Strip the blueprint leftovers, the duplicate function, and the unused imports.</li>
+  <li>Add a <code>tests/</code> directory with current <code>pytest-homeassistant-custom-component</code>, and move dev tooling to ruff.</li>
+  <li>Add the missing devcontainer <code>Dockerfile</code> or drop <code>.devcontainer.json</code>.</li>
+  <li>Rewrite README and CHANGELOG against your fork, and fix the dates.</li>
+</ol>
+
+<h2>What I could not verify</h2>
+<ul>
+  <li><strong>No live synthesis.</strong> There is no Deepgram API key on this machine, so nothing past the auth check was exercised. Every endpoint fact above comes from unauthenticated probes (which do return real parameter validation errors) plus the docs.</li>
+  <li><strong>Whether <code>/v1/speak</code> rejects <code>text/plain</code>.</strong> Auth is validated before the body, so a dummy key always returns 401 regardless of content type.</li>
+  <li><strong>Whether <code>async_timeout</code> happens to be present on your instance.</strong> It is absent from HA core requirements, but another custom integration could have pulled it in transitively. Worth one command before assuming the diagnosis.</li>
+</ul>
+
+<h2>How to confirm on your instance</h2>
+<p>Three checks, in order, before writing any code:</p>
+<ol>
+  <li>In the HA container or venv, run <code>python -c "import async_timeout"</code> and <code>python -c "import pydub"</code>. Two failures confirms both blockers.</li>
+  <li>Install the fork as-is, restart, and read the log for <code>ModuleNotFoundError</code> during setup of <code>deepgram_tts</code>.</li>
+  <li>If it does load, call <code>tts.speak</code> once directly (should work), then trigger the same text through an Assist pipeline (should raise the pydub <code>RuntimeError</code>). That split is the signature of this specific breakage.</li>
+</ol>
+<p class="meta">Audit: September 15 2026. Fork of alceasan/ha-deepgram-tts at ba59415. Endpoint facts verified by unauthenticated probe against api.deepgram.com; HA facts from home-assistant/core @ dev (2026.10.0.dev0).</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>

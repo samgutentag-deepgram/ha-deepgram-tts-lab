@@ -1,0 +1,14 @@
+# artifacts
+__pycache__/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# misc
+.DS_Store
+.vscode/
+
+# derived spec/plan review copies (render from the .md)
+docs/superpowers/**/*.html
