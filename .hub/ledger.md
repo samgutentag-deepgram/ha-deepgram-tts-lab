@@ -310,3 +310,55 @@ first audio frame is yielded while fewer than five of five chunks have been sent
 It held. 17 socket tests, 62 in the suite.
 Source: tests/test_stream.py · `.venv/bin/pytest -q` → `62 passed in 0.46s`
 Routes to: technical blog post, the testing section
+
+### [surprise] A custom integration's Python cannot be reloaded in place, and that sets the whole loop
+Expected: `homeassistant.reload_config_entry` to pick up an edited `.py` file, the way a
+development server would.
+Actual: `sys.modules` caches the import, so reload re-runs `async_unload_entry` and
+`async_setup_entry` against the module Home Assistant **already loaded**. It is genuinely
+useful for a changed option, a retried catalog fetch, or a replaced API key. It does nothing at
+all for a code edit, a new module, `manifest.json`, `strings.json`, or a new requirement.
+So every code iteration costs one full Home Assistant restart. That is the argument for making
+the copy step instant rather than elegant, and it is why the recommendation is rsync over ssh
+for chapters 5 and 6, with HACS used exactly twice: once at the end of chapter 7 to prove the
+distribution path on a clean instance, and once after the flip to public.
+The second reason matters more than loop speed: Studio Code Server and Samba both tempt you into
+editing on the far side, and then the fix that made it work lives on the Pi instead of in a
+commit. Expensive here specifically, because the lab convention rewrites this history into build
+order later and a fix that never reached git cannot be rewritten into anything.
+Source: docs/deploy-notes.md · docs/deploying.html
+Routes to: the real-hardware checklist, technical blog post
+
+### [surprise] Home Assistant renamed add-ons to apps in 2026.2
+Every tutorial, forum answer, and doc page written before February 2026 calls them add-ons. The
+panel was refactored into the frontend and old `/hassio/addon/...` URLs may break. The Samba
+app's shares were renamed with them: `addons` became `local_apps` and `addon_configs` became
+`app_configs`, both still working.
+Worth recording because it makes almost every existing deployment guide subtly wrong, which is
+exactly the kind of thing worth a paragraph in a post. Also: Studio Code Server is aarch64 and
+amd64 only, so a 32 bit armv7 Pi cannot run it at all.
+Source: docs/deploy-notes.md · researched live 2026-09-15
+Routes to: user-facing blog post, the install section
+
+### [friction] The log tailer looped forever on a failed fetch in one-shot mode
+Symptom: `tail_ha_log.sh` with follow disabled and an unreachable instance never returned.
+Cause: the failure branch called `continue` before the follow check, so a one-shot run behaved
+like a follow run that could never succeed.
+Fix: a failed one-shot fetch now exits 1 with a message naming both variables to check. Found by
+actually running the failure paths against a stub server on localhost rather than by reading the
+script, which is the only reason it was found at all.
+Source: scripts/tail_ha_log.sh
+Routes to: nothing outside the repo, but it is a good example for the testing section of a post
+
+### [decision] shellcheck could not run, and that is recorded rather than glossed
+`shellcheck` is not installed on this machine and there is no Docker daemon to run it in a
+container, so `scripts/deploy.sh` and `scripts/tail_ha_log.sh` have `bash -n` plus real
+execution of every failure path behind them, and no static analysis pass.
+Nothing was installed to fix it. The scripts were written defensively for it instead: quoted
+expansions throughout, rsync arguments built as an array, and two targeted disable comments.
+Open item before the flip to public, because a public repo's shell scripts get read.
+Also worth knowing: the brief asked for POSIX plus `set -o pipefail`, and those are mutually
+exclusive. `pipefail` and arrays won; the shebang is `#!/usr/bin/env bash` and each script says
+so in its header.
+Source: docs/deploy-notes.md · `shellcheck not found`
+Routes to: chapter 7, and the pre-flip checklist
