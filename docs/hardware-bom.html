@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware for the Flux TTS voice demo</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+  .subtitle { color: var(--muted); font-size: 0.95rem; }
+  table.bom th, table.bom td { font-size: 0.85rem; vertical-align: top; }
+  table.bom code.lnk {
+    font-size: 0.78em;
+    background: none;
+    padding: 0;
+    color: var(--faint);
+    word-break: break-all;
+  }
+  table.bom .stk { display: block; font-size: 0.78rem; color: var(--faint); font-family: system-ui, sans-serif; }
+  table.bom tr.total td { font-family: system-ui, sans-serif; font-weight: 600; }
+  ol li, ul li { margin-bottom: 0.35rem; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<h1>Hardware for the Flux TTS voice demo</h1>
+<p class="subtitle">A bill of materials for putting Deepgram Flux TTS in a room, out loud, on camera.
+Every price and stock figure below was read off the seller's own product page on
+<strong>2026-09-15</strong>. Anything I could not read off a vendor page is labeled.</p>
+
+<h2>1. Buy this</h2>
+
+<p>In this order, today:</p>
+
+<ol>
+  <li><strong>Two Home Assistant Voice Preview Edition, $58.95 each.</strong> In stock at CloudFree
+  (239 units) and at ameriDroid. Buy both now. The second one is the entire multi-room demo, and it
+  is the single item on this list most likely to be gone next month.</li>
+  <li><strong>One Creative Pebble V3, $42.74.</strong> It is the speaker that makes the response
+  sound like something on video, and its USB-C audio mode doubles as a sound card for the Home
+  Assistant host, which is how you test <code>tts.speak</code> before the pucks land.</li>
+  <li><strong>One 3.5 mm male to male cable, $2.50.</strong> Voice PE headphone jack to Pebble aux
+  in.</li>
+</ol>
+
+<p><strong>$163.14 before tax and shipping.</strong> Nothing is on backorder. While you wait for the
+boxes, the <em>Web browser</em> player in Home Assistant's Media panel will play Flux audio in your
+laptop for zero dollars, tonight, and that is enough to finish chapters 2 through 5.</p>
+
+<p>The rest of this document is why, and what the alternatives cost you.</p>
+
+<h2>2. How audio actually leaves the integration</h2>
+
+<p>You cannot pick hardware without this part, because the choice of playback device decides whether
+the streaming work in chapter 6 is visible or invisible.</p>
+
+<h3>The TTS entity never touches a speaker</h3>
+
+<p>Our entity returns bytes. That is the whole contract. What turns bytes into sound is a chain with
+an HTTP hop in the middle. Read from <code>homeassistant/components/tts/__init__.py</code> on the
+<code>dev</code> branch on 2026-09-15:</p>
+
+<ol>
+  <li>Something asks for speech: an Assist pipeline run, or a <code>tts.speak</code> call, or
+  <code>assist_satellite.announce</code>.</li>
+  <li>HA's <code>SpeechManager</code> creates a <code>ResultStream</code> with a random token and
+  hands back two identifiers: a media source id, and a URL,
+  <code>/api/tts_proxy/{token}</code>.</li>
+  <li>The caller targets a <code>media_player</code>. HA calls <code>play_media</code> on it with
+  the media source id, which resolves to that proxy URL.</li>
+  <li>The player fetches the URL over plain HTTP. The view serving it is
+  <code>TextToSpeechView</code>, and it is marked <code>requires_auth = False</code>, so anything on
+  the LAN that can reach HA can fetch it.</li>
+  <li>Our generator is drained into that response as it produces bytes.</li>
+</ol>
+
+<p>Step five is the one that matters. The proxy is an aiohttp <code>StreamResponse</code>. It calls
+<code>prepare()</code> when the first chunk arrives, <code>write()</code> per chunk, and
+<code>write_eof()</code> at the end. There is no <code>Content-Length</code> and no byte range
+support. Home Assistant is doing chunked transfer on purpose: our first audio frame can be on the
+wire before Deepgram has finished the sentence.</p>
+
+<p>Whether that survives is entirely up to the thing on the other end of the socket.</p>
+
+<blockquote>
+<p>There is a HEAD handler on that same view, and the comment above it says it exists because
+"some DLNA renderers, like Samsung ones" send HEAD before GET. It answers with a content type and
+no length. That comment is a map of where this design leaks: players that want to know the size
+before they start.</p>
+</blockquote>
+
+<h3>A media player is not a voice satellite</h3>
+
+<p>Two different entity types, and confusing them is the classic first-day mistake.</p>
+
+<table>
+<tr><th></th><th><code>media_player</code></th><th><code>assist_satellite</code></th></tr>
+<tr><td>Job</td><td>Play a URL</td><td>Run a whole pipeline: wake word, speech to text, conversation, speech back</td></tr>
+<tr><td>State</td><td>playing, paused, idle</td><td>idle, listening, processing, responding</td></tr>
+<tr><td>Speaks via</td><td><code>tts.speak</code> with <code>media_player_entity_id</code></td><td><code>assist_satellite.announce</code></td></tr>
+<tr><td>Has a mic</td><td>No</td><td>Yes, that is the point</td></tr>
+</table>
+
+<p>A Voice PE registers as an <code>assist_satellite</code> <em>and</em> exposes a companion
+<code>media_player</code>. Firing <code>tts.speak</code> at that companion player can flip its state
+to playing and produce no sound at all, because the audio never enters the satellite's announcement
+path. The fix is <code>assist_satellite.announce</code> targeting the satellite. The clearest public
+write-up of that trap is a dev.to post from June 2024, which is old and is one person's experience,
+so treat the post as weak, but the code path in
+<code>homeassistant/components/esphome/assist_satellite.py</code> is consistent with it.</p>
+
+<h3>The two ways audio reaches an ESPHome satellite</h3>
+
+<p>This is the most useful thing I found, and it is verifiable in core today. ESPHome satellites
+split on a feature flag, and the two halves want <em>different audio formats from us</em>.</p>
+
+<table>
+<tr><th>Path</th><th>When</th><th>What happens</th></tr>
+<tr>
+  <td><strong>HA pushes PCM</strong></td>
+  <td>Device advertises the <code>SPEAKER</code> feature. Old-style satellites, for example the Atom Echo.</td>
+  <td>HA reads our stream itself and pushes it to the device over the ESPHome API or UDP at 16 kHz, 16-bit, mono, 512 samples per chunk. It refuses anything that is not WAV: <code>if tts_result.extension != "wav"</code> logs "Only WAV audio can be streamed" and gives up. It paces the send against a ring buffer on the device that the code's own comment says is "fixed at 512ms", held at "around 384ms (75% full)".</td>
+</tr>
+<tr>
+  <td><strong>Device pulls the URL</strong></td>
+  <td>Device advertises <code>ANNOUNCE</code> and a media player. The Voice PE.</td>
+  <td>HA sends the device the proxy URL and the device fetches it itself, in the format the device asked for. HA reads that format off the device and sets <code>preferred_format</code>, <code>preferred_sample_rate</code>, <code>preferred_sample_channels</code> and <code>preferred_sample_bytes</code> accordingly.</td>
+</tr>
+</table>
+
+<p>For the Voice PE specifically, that format is not a guess. Its own ESPHome config declares the
+announcement pipeline as <code>format: FLAC</code>, <code>num_channels: 1</code>,
+<code>sample_rate: 48000</code>, with the inline comment "FLAC is the least processor intensive
+codec". So on a Voice PE, our WAV goes through one ffmpeg hop into mono 48 kHz FLAC on the way
+out.</p>
+
+<p>Both of these vindicate HANDOFF decision 5.6. Returning WAV is not a compromise, it is the format
+one path requires outright and the other transcodes from most cheaply. HA's converter even passes
+<code>-probesize 32</code> when the live input is WAV, with the comment "The container is known, so
+minimize probing latency for live TTS audio." Returning MP3 would put us on the slow side of that
+branch for no benefit.</p>
+
+<h3>Wyoming and ESPHome, and which one is dying</h3>
+
+<p>Two transports, and the received wisdom about them is now out of date.</p>
+
+<ul>
+  <li><strong>Wyoming</strong> is a small socket protocol. It is still how Piper, Whisper,
+  openWakeWord and Speech-to-Phrase attach to HA as services, and that is not going anywhere.</li>
+  <li><strong>Wyoming as a satellite transport is over.</strong>
+  <code>rhasspy/wyoming-satellite</code>, the project every "build a Pi voice satellite" tutorial
+  targets, is <strong>archived and read only</strong>. The GitHub API returns
+  <code>"archived": true</code> with a last push of 2026-01-24 and 212 open issues left standing.
+  A search snippet of the repo page puts the archive date at 2026-01-27.</li>
+  <li><strong>The replacement speaks the ESPHome protocol instead.</strong>
+  <code>OHF-Voice/linux-voice-assistant</code>, Apache-2.0, 618 stars, last pushed 2026-09-03, and
+  now renamed (the <code>hav-sat</code> repo returns byte-identical metadata, so it is the same repo
+  behind a rename). Its README calls itself "an experimental voice satellite software for Home
+  Assistant remote voice control" and wants a 1 GHz CPU, 512 MB of memory and 16 kHz mono
+  audio.</li>
+</ul>
+
+<p>So anything you build on a Raspberry Pi should target the ESPHome protocol through Linux Voice
+Assistant, not Wyoming, and it lands you on "experimental" software either way. That single fact
+moves a Pi satellite from "the frugal choice" to "the project."</p>
+
+<h2>3. The cheapest way to hear Flux in your house</h2>
+
+<p>Three honest rungs. The first is free.</p>
+
+<h3>Zero dollars: the browser as the player</h3>
+
+<p>Media panel, Text-to-speech, pick the engine, type a sentence, and in Choose player pick
+<strong>Web browser</strong>. That target is real and current: the HA frontend's own translation
+file on <code>dev</code> carries <code>"web-browser": "Web browser"</code> in its media browser
+strings.</p>
+
+<p><strong>What it proves:</strong> the API key works, voice selection works, language routing picks
+an Aura voice for Spanish, the bytes decode, and Flux sounds the way you want on the machine you are
+sitting at. That covers HANDOFF verification for chapters 2 through 5 except the words "on the real
+instance."</p>
+
+<p><strong>What it cannot prove:</strong> there is no microphone, no wake word, and no hands-free
+anything. The browser is not a <code>media_player</code> entity, so it exercises neither the
+<code>tts.speak</code> path nor the announce path, which are exactly the two paths that break in
+interesting ways. And browser media buffering is not under HA's control, so any timing you take here
+is noise. Inferred, not measured.</p>
+
+<h3>$12.50: a real media_player on the Home Assistant host</h3>
+
+<p>Plug the Adafruit Mini External USB Stereo Speaker into the HA host. It is a USB audio class
+device, so no driver work. Then install the official <strong>VLC</strong> app (formerly add-on,
+version 1.1.0, built for aarch64 and amd64, declared <code>audio: true</code>). It discovers itself
+into the <code>vlc_telnet</code> integration and you get a genuine <code>media_player</code> entity
+whose output is the host's audio device. The <code>vlc_telnet</code> docs say it plainly: "You can
+run a VLC Media Player on your Home Assistant installation using the official VLC app."</p>
+
+<p>You need this step because Home Assistant OS does not hand you a <code>media_player</code> for a
+locally attached speaker on its own. No official doc says so in one line, several years of community
+threads say so at length, and the existence of an official VLC app is the strongest evidence. Call
+that claim weak but well supported.</p>
+
+<p>This rung is what makes <code>tts.speak</code> real, and it is the right place to first measure
+time to first audio, because the chain is short and nothing in it is trying to be clever.</p>
+
+<h3>What does not work, so you do not waste an evening</h3>
+
+<ul>
+  <li><strong>The companion app on your phone.</strong> Android TTS notifications
+  (<code>message: "TTS"</code> plus <code>tts_text</code>) use the phone's own speech engine, not a
+  Home Assistant TTS entity. The docs limit it to "the current Text To Speech locale set on the
+  device." It cannot speak Flux. iOS has no equivalent at all.</li>
+  <li><strong>An existing smart speaker as output only.</strong> You own none, so this is a purchase,
+  not a shortcut. A Cast or Sonos speaker costs more than a Voice PE, gives you no microphone, and
+  drops a buffering black box into the one measurement this project cares about.</li>
+  <li><strong>Bluetooth to the HA host.</strong> Possible, miserable, and it adds a variable latency
+  you will then have to explain on camera. Skip it.</li>
+</ul>
+
+<h2>4. Three tiers</h2>
+
+<p>Prices checked 2026-09-15 on the linked vendor pages. Tax and shipping are not included.</p>
+
+<h3>Tier 1: Bench. $12.50</h3>
+
+<p>Proves the integration works. Has no microphone and is not a demo.</p>
+
+<table class="bom">
+<tr><th>Part</th><th>Vendor</th><th>Unit</th><th>Qty</th><th>Why it is here</th></tr>
+<tr>
+  <td>Mini External USB Stereo Speaker (3369)<br><a href="https://www.adafruit.com/product/3369"><code class="lnk">www.adafruit.com/product/3369</code></a></td>
+  <td>Adafruit</td><td>$12.50<br><span class="stk">In stock</span></td><td>1</td>
+  <td>USB audio class, so the HA host gets an output device with no driver work, and the VLC app turns it into a real <code>media_player</code>.</td>
+</tr>
+<tr class="total"><td colspan="3">Total</td><td>1</td><td>$12.50</td></tr>
+</table>
+
+<p>Substitute, if you would rather not buy anything: the Web browser player, $0. Already covered.
+Related part worth knowing about but not needed here: the Adafruit USB Audio Adapter (1475), $4.95,
+in stock, which is the answer if you end up with a 3.5 mm speaker and a host with no jack.</p>
+
+<h3>Tier 2: One room, hands free. $58.95</h3>
+
+<p>A genuine voice assistant in one room. One line item, and padding it would be dishonest.</p>
+
+<table class="bom">
+<tr><th>Part</th><th>Vendor</th><th>Unit</th><th>Qty</th><th>Why it is here</th></tr>
+<tr>
+  <td>Home Assistant Voice Preview Edition<br><a href="https://cloudfree.shop/products/home-assistant-voice-preview-edition"><code class="lnk">cloudfree.shop/products/home-assistant-voice-preview-edition</code></a></td>
+  <td>CloudFree, or ameriDroid at the same price<br><a href="https://ameridroid.com/products/home-assistant-voice-preview-edition"><code class="lnk">ameridroid.com/products/home-assistant-voice-preview-edition</code></a></td>
+  <td>$58.95<br><span class="stk">239 in stock</span></td><td>1</td>
+  <td>The only device you can buy that is a dual mic array with hardware echo cancellation, a speaker, on-device wake word, and an <code>assist_satellite</code> entity, with nothing to solder or flash.</td>
+</tr>
+<tr class="total"><td colspan="3">Total</td><td>1</td><td>$58.95</td></tr>
+</table>
+
+<p>Nothing else belongs in this tier. It needs no speaker (it has one), no DAC (it has one), no
+enclosure, and no microSD card. The official page lists $69 as MSRP; the two US resellers I checked
+were both below it.</p>
+
+<h3>Tier 3: Two rooms, on camera. $163.14</h3>
+
+<p>Good enough to film. The second puck is not a luxury: a multi-room claim that happens in one room
+is not a demo, it is a screenshot.</p>
+
+<table class="bom">
+<tr><th>Part</th><th>Vendor</th><th>Unit</th><th>Qty</th><th>Why it is here</th></tr>
+<tr>
+  <td>Home Assistant Voice Preview Edition<br><a href="https://cloudfree.shop/products/home-assistant-voice-preview-edition"><code class="lnk">cloudfree.shop/products/home-assistant-voice-preview-edition</code></a></td>
+  <td>CloudFree</td><td>$58.95<br><span class="stk">239 in stock</span></td><td>2</td>
+  <td>One per room. Two devices is what lets you walk out of frame, ask again, and have a different voice answer in the next room.</td>
+</tr>
+<tr>
+  <td>Creative Pebble V3<br><a href="https://us.creative.com/p/speakers/creative-pebble-v3"><code class="lnk">us.creative.com/p/speakers/creative-pebble-v3</code></a></td>
+  <td>Creative</td><td>$42.74</td><td>1</td>
+  <td>The on-camera speaker. The Voice PE headphone jack has its own DAC, so this is where the response stops sounding like a phone alarm. USB-C audio mode also makes it the host sound card for Tier 1 work, which is why it earns its place twice.</td>
+</tr>
+<tr>
+  <td>3.5mm male to male stereo cable, 1 m (2698)<br><a href="https://www.adafruit.com/product/2698"><code class="lnk">www.adafruit.com/product/2698</code></a></td>
+  <td>Adafruit</td><td>$2.50<br><span class="stk">3 in stock</span></td><td>1</td>
+  <td>Voice PE jack to Pebble aux in. Buy two if you plan to move the speaker between rooms.</td>
+</tr>
+<tr class="total"><td colspan="3">Total</td><td>4</td><td>$163.14</td></tr>
+</table>
+
+<p>Deliberately not in this tier: a Raspberry Pi, any microphone HAT, any USB mic array, any second
+speaker. Every one of them adds build time and none of them changes what the video shows.</p>
+
+<h2>5. The devices, with opinions</h2>
+
+<h3>Home Assistant Voice Preview Edition. Buy it.</h3>
+
+<p>$58.95 at CloudFree ("239 in stock") and at ameriDroid ("In stock"), against a $69 official MSRP,
+all three pages checked 2026-09-15. ESP32-S3 with 16 MB flash and 8 MB octal PSRAM, dual mic array
+fronted by an XMOS XU316 doing echo cancellation, noise removal and auto gain, an internal speaker,
+and a 3.5 mm output with a dedicated DAC.</p>
+
+<p><strong>Works with our integration:</strong> yes, and by the better of the two paths. It is an
+<code>assist_satellite</code> with announce support, so it fetches our audio from the TTS proxy
+itself as mono 48 kHz FLAC. No PCM babysitting, no format guessing.</p>
+
+<p><strong>Mic:</strong> reviewers split. Some are happy at a normal speaking voice across a home
+office; at least one had to get close before the wake word landed, and everyone agrees accuracy
+falls off in a noisy room. Call it good to a few meters in a quiet room. All of that is reviews, so
+weak.</p>
+
+<p><strong>Speaker:</strong> fine for a spoken reply, thin for anything else, and reviewers call it
+too quiet for a kitchen. Which is what the headphone jack is for.</p>
+
+<p><strong>What it is actually good for:</strong> everything this project needs, and it is the only
+item on the list that looks like a product on camera rather than a dev board with wires.</p>
+
+<h3>ESP32-S3-BOX-3. Do not order it.</h3>
+
+<p>$49.95 at Adafruit and the page says <strong>Out of stock</strong> (checked 2026-09-15). Search
+snippets claim 43 units at Mouser and same-day shipping at DigiKey, but Mouser timed out twice,
+DigiKey and Octopart both returned 403, and I will not put a price in a bill of materials I could
+not read. Home Assistant still documents it (docs version 2026.9.2) with web-flashable firmware, and
+it has a touchscreen, which is genuinely nice on video.</p>
+
+<p><strong>Verdict:</strong> technically fine, functionally similar to the Voice PE, more expensive
+than the Voice PE, and I cannot give you a buy link I trust. The screen is the only argument for it
+and it is not worth a stock hunt.</p>
+
+<h3>M5Stack ATOM Echo. $13.50, and it will make your streaming work invisible.</h3>
+
+<p>"Regular price $13.50 USD", "10+ In Stock" on M5Stack's own store, checked 2026-09-15. SPM1423
+PDM microphone, a 0.8 W speaker through an NS4168. This is the device behind Home Assistant's own
+"$13 voice assistant" tutorial, which is still published.</p>
+
+<p><strong>The problem is the chip.</strong> It is a classic ESP32, not an S3, so microWakeWord will
+not run on it and the wake word has to run server-side in Home Assistant with the openWakeWord app.
+That means it streams audio to HA continuously and your wake-to-response time picks up a whole extra
+network and inference stage that has nothing to do with us.</p>
+
+<p><strong>And it takes the PCM path,</strong> because it advertises the <code>SPEAKER</code>
+feature. HA reads our stream and pushes 16 kHz mono PCM to it, paced against a 512 ms ring buffer
+that the code holds at roughly 384 ms. So expect somewhere around 0.3 to 0.5 s of device-side
+latency before anyone hears anything. <strong>Inferred from the pacing code and its comments, not
+measured.</strong></p>
+
+<p><strong>Good for:</strong> a $13 second or third room, a throwaway, proving the integration works
+on hardware you do not mind bricking. Bad for: any sentence in a blog post that contains the words
+"time to first audio". Worth knowing: the <strong>Atom EchoS3R</strong> is $14.50, "10+ In Stock",
+and fixes the chip (ESP32-S3-PICO with an ES8311 codec and a 1 W speaker), but I could find no
+Home Assistant or ESPHome page covering that specific board, so buying it is a small research
+project. Flagged as unverified.</p>
+
+<h3>A Raspberry Pi satellite. The trap, this year specifically.</h3>
+
+<p>The parts are cheap and in stock: Pi Zero 2 W $17.25 at PiShop.us, or $20.75 with headers
+pre-soldered, which you need for any HAT unless you like soldering. Add a $5.95 Adafruit Mini USB
+Microphone ("needs no driver") and the $12.50 USB speaker and you are at about $37 to $52.</p>
+
+<p><strong>The software underneath moved this year.</strong> Every tutorial you will find points at
+<code>rhasspy/wyoming-satellite</code>, which is archived and read only with 212 open issues left
+behind. The live path is <code>OHF-Voice/linux-voice-assistant</code>, which speaks the ESPHome
+protocol, is actively pushed (2026-09-03), and describes itself as experimental. It wants PulseAudio
+or PipeWire and 16 kHz mono in.</p>
+
+<p><strong>Verdict:</strong> the cheapest way to get a second satellite if your time is free, and the
+most expensive if it is not. You are debugging ALSA device names and an experimental daemon in the
+same week you are trying to measure a websocket. It is also the ugliest thing on this list on
+camera. Skip it for the demo; revisit it if you ever want a satellite in a closet.</p>
+
+<h3>ReSpeaker, the whole family. One of them is worth it, and not for this.</h3>
+
+<table>
+<tr><th>Board</th><th>Price, 2026-09-15</th><th>Read</th></tr>
+<tr>
+  <td>ReSpeaker 2-Mics Pi HAT V2.0<br><a href="https://www.seeedstudio.com/ReSpeaker-2-Mics-Pi-HAT.html"><code class="lnk">www.seeedstudio.com/ReSpeaker-2-Mics-Pi-HAT.html</code></a></td>
+  <td>$13.99, "In stock"</td>
+  <td>The classic Pi satellite HAT. V2.0 swapped the codec to a TLV320AIC3104 and added Pi 5 support, which fixes the old complaint, but you still compile and install a device tree overlay from Seeed's dtoverlays repo by hand. Budget an evening.</td>
+</tr>
+<tr>
+  <td>ReSpeaker Lite Voice Assistant Kit, full kit<br><a href="https://www.seeedstudio.com/ReSpeaker-Lite-Voice-Assistant-Kit-Full-Kit-of-2-Mic-Array-pre-soldered-XIAO-ESP32S3-Mono-Enclosed-Speaker-and-Enclosure.html"><code class="lnk">www.seeedstudio.com/ReSpeaker-Lite-Voice-Assistant-Kit-Full-Kit-of-2-Mic-Array-pre-soldered-XIAO-ESP32S3-Mono-Enclosed-Speaker-and-Enclosure.html</code></a></td>
+  <td>$26.99, stock not stated on the page</td>
+  <td>The most interesting one. XIAO ESP32S3 pre-soldered to a 2-mic array with the same XMOS XU316 the Voice PE uses, plus a 5 W enclosed speaker and an acrylic case, and Seeed documents the ESPHome path. Half the price of a Voice PE with comparable audio silicon. It looks like a kit, because it is one.</td>
+</tr>
+<tr>
+  <td>ReSpeaker XVF3800 USB 4-Mic Array with case<br><a href="https://www.seeedstudio.com/ReSpeaker-XVF3800-USB-4-Mic-Array-With-Case-p-6490.html"><code class="lnk">www.seeedstudio.com/ReSpeaker-XVF3800-USB-4-Mic-Array-With-Case-p-6490.html</code></a></td>
+  <td>$59.90, "In stock" (10+ $54.90)</td>
+  <td>The genuinely good microphone on this page: XMOS XVF3800, four mics, beamforming, direction of arrival, dereverberation, 360 degrees to about 5 m, and it enumerates as a plain USB audio device on a Pi. It is a microphone though. It is not a speaker and it is not a satellite.</td>
+</tr>
+<tr>
+  <td>6-mic circular array and the older HATs</td>
+  <td>not priced here</td>
+  <td>Avoid. The Pi 5's audio pins hang off RP1, whose I2S blocks have no TDM, so 8-slot frames cannot be captured and the old <code>seeed-voicecard</code> driver story turns into third-party forks. This is a search-result summary, so weak, but the direction is clear enough to stay away.</td>
+</tr>
+</table>
+
+<p>Adjacent and worth one line: the <strong>FutureProofHomes Satellite1.1 HAT</strong>, $54.99, is
+the nicest DIY satellite board there is, 4 mics plus XMOS plus a 25 W amplifier. Its own page says
+"Available on backorder, Restock Jul 15, 2026", a date two months in the past as of today, so real
+availability is unknown. Not recommendable on that basis.</p>
+
+<h3>An existing smart speaker as output only. Not available to you.</h3>
+
+<p>You own zero speakers, so there is no "existing" here, and the pattern is worth evaluating only
+so you can say why you skipped it. Buying a Cast or Sonos device to be an output for our TTS spends
+Voice PE money on a thing with no microphone, and it puts a closed buffering pipeline between our
+first audio frame and the room. If you ever inherit one, it is a fine place to send a long-form
+announcement and a bad place to measure anything.</p>
+
+<h2>6. What matters for a cloud streaming TTS integration</h2>
+
+<p>HANDOFF section 5 item 6 and chapter 6 both hang on one number: time to first audio. Hardware can
+make that number meaningless, and here is exactly how.</p>
+
+<h3>Things that destroy the measurement</h3>
+
+<table>
+<tr><th>Choice</th><th>What it does</th><th>Confidence</th></tr>
+<tr>
+  <td><strong>Snapcast, anywhere in the chain</strong></td>
+  <td>Music Assistant's own docs: "The total buffer between the signal being read on the server and played out on the client, which is also the total latency of the audio. The default is 1000 ms." A full second, by design, adjustable from 200 to 6000 ms. Home Assistant even ships a <code>snapcast.set_latency</code> action.</td>
+  <td>Verified, vendor docs</td>
+</tr>
+<tr>
+  <td><strong>Music Assistant announcements</strong></td>
+  <td>For players with no native announce, MA stops the music, adjusts volume, plays the clip, then restores state. That is a serial sequence around our audio. Community reports put the visible delay at 10 to 20 seconds in some versions.</td>
+  <td>Docs for the mechanism, forum threads for the numbers, so weak on magnitude</td>
+</tr>
+<tr>
+  <td><strong>Chromecast</strong></td>
+  <td>A pychromecast issue records live streams stuck in BUFFERING for about 20 s versus about 1 s for a static MP3 URL. Old, and a single report.</td>
+  <td>Weak, but the failure mode is real and structural: it wants to prebuffer</td>
+</tr>
+<tr>
+  <td><strong>DLNA renderers</strong></td>
+  <td>Our stream has no <code>Content-Length</code>. HA's proxy carries a HEAD handler specifically for Samsung DLNA renderers that ask first. A renderer that insists on a size either stalls or buffers to the end.</td>
+  <td>Verified from core source and its comment</td>
+</tr>
+<tr>
+  <td><strong>The HA TTS cache</strong></td>
+  <td>Not hardware, but it will fool you first. <code>tts.speak</code> defaults <code>cache: true</code>, and the non-streaming setter is documented as using a disk cache. Say the same sentence twice and the second run measures the file system. Measure with <code>cache: false</code> and a fresh sentence every time.</td>
+  <td>Verified from core source</td>
+</tr>
+</table>
+
+<h3>Things that preserve it</h3>
+
+<ul>
+  <li><strong>The VLC app on the HA host.</strong> Shortest chain available: our generator, the
+  chunked proxy, one local HTTP fetch, one audio device.</li>
+  <li><strong>A Voice PE.</strong> It fetches the URL itself as FLAC and starts playing on arriving
+  frames. One ffmpeg transcode hop on our side, which is streaming-safe. Tens of milliseconds, not
+  hundreds. <strong>Inferred, not measured.</strong></li>
+  <li><strong>The pipeline handoff itself is early.</strong> HA emits the TTS URL to the satellite as
+  soon as the stream token exists, not when the audio is complete, so the device can be fetching
+  while Flux is still generating. Verified in
+  <code>esphome/assist_satellite.py</code>.</li>
+</ul>
+
+<h3>What to actually instrument</h3>
+
+<p>Three timestamps, and keep them separate. First, the Deepgram socket's first binary frame,
+measured in our client. Second, the first byte we write into the TTS proxy response. Third, the
+wall-clock moment sound leaves a speaker, which you can only get with a microphone and a waveform.
+The gap between one and two is ours to defend. The gap between two and three belongs to the hardware
+choices in this table, and a Snapcast group will happily add a second to it and make our work
+invisible.</p>
+
+<p>One more integration-side note that hardware forces: the socket gives raw
+<code>linear16</code> with no container, and both playback paths are happiest with WAV, so the WAV
+header decision is doing real work rather than being a formality. What we do not know is the sample
+rate the Flux socket emits at, and that matters because one path wants 16 kHz and the other wants
+48 kHz. Find it in chapter 2 and write it down.</p>
+
+<h2>7. What filming needs that working does not</h2>
+
+<p>Working means audio comes out. Filming means a viewer believes it.</p>
+
+<ol>
+  <li><strong>The device has to be in frame and has to look like a device.</strong> The Voice PE is
+  the only thing here that reads as a product. A bare ESP32 board taped to a shelf, or a speaker
+  hidden behind the laptop, makes the shot look staged even when it is not. If the sound comes from
+  somewhere the viewer cannot see, they assume you pressed play.</li>
+  <li><strong>The LED ring is your edit.</strong> Wake word chime, then listening, then responding.
+  Those transitions are visible on camera and they are natural cut points and natural proof of
+  liveness. Shoot wide enough to keep the ring readable.</li>
+  <li><strong>Route audio out to the Pebble for the on-camera room.</strong> The internal speaker is
+  built for voice feedback and reviewers call it too quiet for a kitchen. On a camera mic, thin and
+  quiet becomes unusable. The 3.5 mm jack has a dedicated DAC, so this costs you nothing in
+  quality.</li>
+  <li><strong>Pick a soft room.</strong> Carpet, curtains, a couch. A hard room gives you reverb,
+  which hurts twice: the wake word misses more, and the recording sounds like a parking garage.
+  Stand 1 to 2 m away, which is also where the mic array actually performs.</li>
+  <li><strong>Capture the room and the logs separately.</strong> Do not try to frame a speaker and a
+  screen full of Home Assistant logs in one shot. Record the room take, then screen-record the
+  Assist debug view on its own, and cut the timing numbers in as text. A phone on a tripod and a
+  screen recorder beats a compromise wide shot.</li>
+  <li><strong>The second room is the argument.</strong> One continuous shot where you ask in the
+  office, walk to the kitchen, ask again, and a different Flux voice answers from a different device
+  is worth more than any latency chart. That is the one thing you cannot fake in post and the
+  specific reason to buy two pucks rather than one.</li>
+</ol>
+
+<p>One thing to watch: your own recording setup will hear the TTS playback. The Voice PE's XMOS chip
+does echo cancellation for the device's mic, not for yours. If you are also recording a voiceover
+in the room, record it separately.</p>
+
+<h2>8. Microphones, treated honestly</h2>
+
+<p>Our integration is text to speech. It has no microphone story at all. But nobody believes a voice
+assistant demo where the human types, so the bill of materials has to leave you able to talk to the
+thing, and that means speech to text from somewhere.</p>
+
+<p><strong>Three options, in order of how little they will cost you in time:</strong></p>
+
+<ol>
+  <li><strong>Home Assistant Cloud.</strong> If you have a Nabu Casa subscription, STT is already
+  configured and this is a non-decision.</li>
+  <li><strong>The Whisper app locally.</strong> Official, Wyoming-based, still maintained in
+  <code>home-assistant/addons</code>. Costs CPU, costs nothing else.</li>
+  <li><strong>Deepgram STT.</strong> There is a community custom integration,
+  <code>Automaat/deepgram-stt</code>, MIT licensed, Nova-3, created 2026-01-31 and pushed
+  2026-09-15, with 1 star and 3 open issues. It is alive but it is one person's early project. It is
+  a useful reference and a bad dependency for a demo you are filming. Nova-3 monolingual streaming
+  is listed at $0.0048 per minute pay as you go (regular $0.0077), checked 2026-09-15 on Deepgram's
+  pricing page, against Flux TTS at $0.045 per 1,000 characters.</li>
+</ol>
+
+<p>There is an obvious content argument for Deepgram on both ends of the pipeline. Take it if you
+want, but take it as a separate piece of work, after chapter 5 is on real hardware. Do not let it
+block the TTS integration.</p>
+
+<p><strong>Which hardware decisions are the microphone's, not the speaker's.</strong> This is the
+useful separation, because almost every dollar above Tier 1 is mic money:</p>
+
+<ul>
+  <li><strong>Mic array and echo cancellation.</strong> The reason a Voice PE costs $59 and a USB mic
+  costs $6 is the XMOS chip. Without echo cancellation, the device hears its own TTS output and
+  retriggers or talks over itself. That is a mic requirement created by having a speaker.</li>
+  <li><strong>On-device wake word.</strong> Needs an ESP32-S3. The Atom Echo's plain ESP32 cannot do
+  it, so the wake word moves to the HA server and the room streams audio continuously.</li>
+  <li><strong>Far-field range.</strong> Beamforming is what makes 4 m work instead of 1 m, and it is
+  the whole value of the XVF3800 board.</li>
+  <li><strong>The HAT driver tax.</strong> Device tree overlays, codec drivers, ALSA names. Pure mic
+  cost, zero benefit to output.</li>
+</ul>
+
+<p>If you only ever wanted output, Tier 1 is $12.50 and you are done. Everything above it is the
+price of being able to talk.</p>
+
+<h2>9. Recommendation</h2>
+
+<p>Buy two Home Assistant Voice Preview Edition units at $58.95 each from CloudFree or ameriDroid
+today, plus a Creative Pebble V3 at $42.74 and a $2.50 3.5 mm cable, for $163.14 before tax and
+shipping, and buy them in that order for a reason: the pucks are the only item with real stock risk,
+the Pebble is the item you can use before they arrive, and everything else is optional. All three
+vendors show stock now and none list a lead time, so expect ordinary domestic shipping rather than a
+wait; order this week and you are building against hardware next week. Do not buy a Raspberry Pi, a
+microphone HAT, or an ESP32-S3-BOX-3. The Pi path now depends on software that replaced an archived
+project and calls itself experimental, the HATs cost you an evening of device tree work, and the
+S3-BOX-3 is out of stock at the only vendor whose page I could actually read. Between now and the
+delivery, work against the Web browser player for free, then against the VLC app and a $12.50 USB
+speaker if you want a real <code>media_player</code> in the loop, and save the first honest time to
+first audio measurement for the Voice PE, which is the only device here whose playback path does not
+distort it.</p>
+
+<h2>10. What I could not verify</h2>
+
+<ul>
+  <li><strong>ESP32-S3-BOX-3 price and stock outside Adafruit.</strong> Mouser timed out twice,
+  DigiKey and Octopart returned 403, and the Amazon listing did not render a price. Adafruit's own
+  page, $49.95 and out of stock, is the only figure I stand behind.</li>
+  <li><strong>Raspberry Pi Zero 2 W stock.</strong> PiShop.us shows $17.25 and $20.75 with headers
+  but no in-stock wording either way, only a one-per-customer limit.</li>
+  <li><strong>ReSpeaker Lite kit stock.</strong> Seeed's page gives $26.99 and three warehouse
+  options but no stock count.</li>
+  <li><strong>Satellite1.1 HAT availability.</strong> Its page says backorder with a restock date of
+  2026-07-15, which is already past. I did not email them.</li>
+  <li><strong>Atom EchoS3R software support.</strong> $14.50 and in stock, but no Home Assistant or
+  ESPHome documentation for that exact board. One customer review mentions using it with HA.</li>
+  <li><strong>Every latency figure that is not sourced to code.</strong> Nothing here was measured on
+  hardware, because there is no hardware yet. The device-side buffer estimate of 0.3 to 0.5 s and
+  the claim that a FLAC transcode costs tens of milliseconds are both inferred from reading the
+  implementation.</li>
+  <li><strong>Microphone and speaker quality judgments.</strong> All of those come from published
+  reviews, not from me listening to anything.</li>
+  <li><strong>The wyoming-satellite archive date</strong> of 2026-01-27 comes from a search snippet.
+  The archived flag and the 2026-01-24 final push are from the GitHub API and are solid.</li>
+  <li><strong>The claim that Home Assistant OS exposes no media player for local audio.</strong>
+  Well supported by community threads and by the existence of an official VLC app, but no single
+  authoritative statement was found.</li>
+</ul>
+
+<p class="meta">Prices and stock read from vendor pages on 2026-09-15. Home Assistant internals read
+from <code>home-assistant/core</code> and <code>home-assistant/frontend</code> at
+<code>dev</code>, and from <code>esphome/home-assistant-voice-pe</code> at <code>dev</code>, the
+same day. Raw facts, links and weighting live in <code>docs/hardware-notes.md</code>.</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>
