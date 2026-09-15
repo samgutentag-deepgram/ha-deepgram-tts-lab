@@ -22,6 +22,7 @@ from homeassistant.components.tts import (
     generate_media_source_id,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
@@ -439,3 +440,32 @@ async def test_tts_speak_service_round_trip(
     assert extension == "mp3"
     assert audio
     assert len(ws.calls) == 1
+
+
+async def test_an_expired_key_surfaces_as_auth_and_does_not_fall_back(
+    hass: HomeAssistant, mock_api: None, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A rejected key must not degrade quietly. It is the one failure batch cannot rescue.
+
+    Falling back here would send the same dead key to `/v2/speak`, fail again, and report
+    whichever error came second. The point of typed errors is that a caller can tell an expired
+    key from a flaky network, so this one propagates.
+    """
+    from aiohttp import WSServerHandshakeError
+
+    entity_id = await setup_entry(hass, flux_entry())
+    handshake_401 = WSServerHandshakeError(
+        SimpleNamespace(real_url="wss://api.deepgram.com/v2/speak"),
+        (),
+        status=401,
+        message="Invalid credentials.",
+    )
+    patcher, _ = patch_ws(hass, None, raises=handshake_401)
+
+    with patcher, pytest.raises(HomeAssistantError, match="rejected the API key"):
+        await stream_through_hass(
+            hass, entity_id, "Expired.", options={ATTR_PREFERRED_FORMAT: "wav"}
+        )
+
+    # And it did not quietly try the same dead key against the batch endpoint.
+    assert not [call for call in aioclient_mock.mock_calls if call[0].upper() == "POST"]

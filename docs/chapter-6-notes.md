@@ -86,6 +86,27 @@ rather than deleted: it now asserts streaming **is** supported and the method **
 class dict, because the fact it pins has not changed. If the method is ever removed or renamed,
 streaming turns off silently and every pipeline reverts to batch with nothing failing.
 
+## What the skeptic pass changed here
+
+Merged from main after the fact, and one of them matters more on this branch than on main:
+**a rejected key on the websocket read as a dead network.** A 401 fails the HTTP upgrade, so it
+arrives as `WSServerHandshakeError`, a `ClientError` subclass, and the generic handler turned it
+into `DeepgramConnectionError`. On this branch that is worse than a mislabeled error: the
+fallback catches exactly that class, so an expired key would have quietly retried the same dead
+key against `/v2/speak`, failed again, and reported whichever error came second.
+
+`DeepgramAuthError` now propagates past the fallback on purpose. It is the one failure batch
+cannot rescue, and `test_an_expired_key_surfaces_as_auth_and_does_not_fall_back` asserts both
+that it surfaces and that no batch request was attempted.
+
+One finding stands unfixed and is worth carrying: **`scripts/measure_first_frame.py` never
+imports `stream.py`.** It measures Deepgram over a socket it opens itself, and its
+`degraded_cleanly` check exercises the batch endpoint rather than this entity's fallback. So
+satisfying the merge gate as written would produce a real latency number and would not validate
+`FluxSocket`. Either the script grows a mode that drives the real client, or the gate needs a
+second step that runs on the instance with the branch deployed. Recorded rather than papered
+over, because a gate that does not test what it gates is worse than no gate.
+
 ## Open, and needs the real instance
 
 1. **First-frame latency.** Unmeasured. `scripts/measure_first_frame.py --runs 20` on the Pi.
