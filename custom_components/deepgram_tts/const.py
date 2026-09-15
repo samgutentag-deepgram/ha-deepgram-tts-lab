@@ -35,7 +35,10 @@ CONF_SPEED: Final = "speed"
 DEFAULT_LANGUAGE: Final = "en"
 DEFAULT_SPEED: Final = 1.0
 
-# Flux only. /v2/speak validates 0.5 to 1.5 in 0.05 increments; Aura has no speed parameter.
+# Flux only; Aura has no speed parameter. The 0.5 to 1.5 range in 0.05 increments comes from
+# Deepgram's docs and is NOT something probing established: /v2/speak returns 401 for speed=3.0,
+# speed=0.1, and speed=1.07 alike, so the range check runs after auth. We constrain it in the
+# options flow anyway. See docs/handoff-corrections.md.
 SPEED_MIN: Final = 0.5
 SPEED_MAX: Final = 1.5
 SPEED_STEP: Final = 0.05

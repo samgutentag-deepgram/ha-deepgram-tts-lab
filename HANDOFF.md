@@ -8,6 +8,18 @@ If you are an agent picking this up: read the whole file before writing code. Se
 facts verified live, not recollection, and re-deriving them from the public docs will give you
 thinner and in places wrong answers.
 
+> **Read `docs/handoff-corrections.md` alongside this file.** Four claims here have been
+> corrected since it was written, and one of them is a headline claim in section 2.1: the
+> community integration's undeclared `async_timeout` import almost certainly **did** resolve on a
+> real instance, because `ha-ffmpeg` requires `async-timeout` with no environment marker and the
+> `tts` component depends on `ffmpeg`. The `pydub` half of that section stands and is the real
+> cause. Section 3.4's `speed` range is also docs-sourced rather than probed: `/v2/speak` returns
+> 401 for an out-of-range speed, so the range check runs after auth.
+>
+> This file is deliberately **not** edited in place. It records what the project believed on
+> 2026-09-15, and knowing where the starting assumptions were wrong is half the value of a build
+> log. Corrections are appended to that other file, never applied here.
+
 ---
 
 ## 1. What this project is

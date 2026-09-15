@@ -4,5 +4,7 @@ pytest-homeassistant-custom-component==0.13.365
 ruff==0.16.7
 
 # Belongs to homeassistant.components.tts, which HA installs at runtime and the test harness
-# does not. It is not ours, so it must not appear in manifest.json requirements.
-mutagen==1.47.0
+# does not. Pinned to what the installed tts manifest actually requires, so the test env matches
+# a real instance. Neither of these is ours, so they must not appear in manifest.json.
+mutagen==1.48.1
+ha-ffmpeg==3.2.2
