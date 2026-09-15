@@ -10,6 +10,16 @@
         "data_description": {
           "api_key": "Used for synthesis requests. The voice catalogs are public and need no key."
         }
+      },
+      "voice": {
+        "title": "Pick a voice",
+        "description": "Flux voices are listed first and are all English. Aura voices follow, English first, then the other languages. Each label ends in the model id this entry sends.",
+        "data": {
+          "voice": "Voice"
+        },
+        "data_description": {
+          "voice": "Add a second entry for a second voice. A non-English pipeline picks an Aura voice on its own."
+        }
       }
     },
     "error": {
@@ -33,6 +43,9 @@
           "speed": "Flux voices only. Aura voices ignore this."
         }
       }
+    },
+    "abort": {
+      "cannot_connect": "Could not reach api.deepgram.com to load the voice list."
     }
   }
 }
