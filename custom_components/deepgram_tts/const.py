@@ -111,3 +111,10 @@ PREFERRED_FORMAT_PARAMS: Final[dict[str, tuple[str, str | None]]] = {
 DEVICE_MODEL_FLUX: Final = "Flux TTS"
 DEVICE_MODEL_AURA: Final = "Aura-2 TTS"
 MANUFACTURER: Final = "Deepgram"
+
+# The streaming path always hands Home Assistant a WAV, whether the audio came off the socket
+# or out of the batch fallback. The extension has to be declared before we know which one will
+# serve the turn, so both produce the same container and there is nothing to reconcile.
+STREAM_EXTENSION: Final = "wav"
+STREAM_ENCODING: Final = WS_ENCODING
+STREAM_CONTAINER: Final = "wav"

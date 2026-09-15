@@ -39,6 +39,7 @@ from .errors import (
     DeepgramRequestError,
 )
 from .models import family_for_model
+from .stream import FluxSocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,10 +110,19 @@ class DeepgramClient:
     def __init__(self, session: ClientSession, api_key: str) -> None:
         """Store the shared Home Assistant session and the key to authenticate with."""
         self._session = session
+        self._api_key = api_key
         self._headers = {
             "Authorization": f"Token {api_key}",
             "Content-Type": "application/json",
         }
+
+    def stream(self, *, model: str, speed: float | None = None) -> FluxSocket:
+        """Open one streaming turn against the Flux socket.
+
+        The client hands back a socket rather than exposing the API key, so the key stays in
+        the one object that owns it and the entity never holds a copy.
+        """
+        return FluxSocket(self._session, self._api_key, model=model, speed=speed)
 
     async def async_verify_key(self) -> None:
         """Round trip a one-word synthesis and discard the audio.

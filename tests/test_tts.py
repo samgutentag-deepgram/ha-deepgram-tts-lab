@@ -1,8 +1,15 @@
-"""Chapter 5's stop condition: the batch path, the Flux default, and no Flux for Spanish.
+"""The batch path, the Flux default, and no Flux for Spanish.
 
-The streaming guard at the bottom is the load-bearing one. It fails the moment chapter 6 adds
-`async_stream_tts_audio`, which is deliberate: nobody should merge the websocket path without
-noticing that Home Assistant starts routing every Assist response down it.
+These call `async_get_tts_audio` on the entity directly, and that is a chapter 6 change worth
+explaining. Chapter 5 drove them through `async_get_media_source_audio`, which is how Home
+Assistant itself synthesizes. The moment chapter 6 defined `async_stream_tts_audio`, the tts
+manager started routing every one of those calls down the websocket instead, so a batch
+assertion made through the manager was quietly asserting on the batch fallback.
+
+That is the trap from HANDOFF section 2.1, reproduced exactly, in this project's own test
+suite: thirteen tests changed behavior because one method came into existence, and nothing
+about them said "batch" any more. They now call the batch entry point by name. Streaming has
+its own file.
 """
 
 from typing import Any
@@ -16,8 +23,9 @@ from homeassistant.components.tts import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity_component import DATA_INSTANCES, EntityComponent
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.deepgram_tts.api import DeepgramClient
@@ -121,7 +129,35 @@ async def setup_entry(hass: HomeAssistant, entry: MockConfigEntry) -> str:
     return entity_ids[0]
 
 
-async def speak_through_hass(
+def loaded_entity(hass: HomeAssistant, entity_id: str) -> DeepgramTTSEntity:
+    """Return the live entity instance the platform added for `entity_id`."""
+    component: EntityComponent = hass.data[DATA_INSTANCES]["tts"]
+    entity = component.get_entity(entity_id)
+    assert isinstance(entity, DeepgramTTSEntity)
+    return entity
+
+
+async def speak_batch(
+    hass: HomeAssistant,
+    entity_id: str,
+    message: str,
+    *,
+    language: str | None = None,
+    options: dict[str, Any] | None = None,
+) -> tuple[str, bytes]:
+    """Synthesize down the batch path, by name.
+
+    Deliberately not through `async_get_media_source_audio`. Once `async_stream_tts_audio`
+    exists the manager always prefers it, so routing a batch test through the manager tests the
+    fallback and calls it the batch path. `tests/test_tts_streaming.py` drives the manager.
+    """
+    entity = loaded_entity(hass, entity_id)
+    return await entity.async_get_tts_audio(
+        message, language or entity.default_language, options or {}
+    )
+
+
+async def stream_through_hass(
     hass: HomeAssistant,
     entity_id: str,
     message: str,
@@ -169,7 +205,7 @@ async def test_flux_haley_is_the_default_on_a_fresh_install(
     """HANDOFF 6.1, chapter 5's first verification. Assert the model sent, not the option."""
     entity_id = await setup_entry(hass, fresh_entry)
 
-    await speak_through_hass(hass, entity_id, "Fresh install.")
+    await speak_batch(hass, entity_id, "Fresh install.")
 
     assert sent_model(aioclient_mock) == DEFAULT_VOICE
     assert sent_model(aioclient_mock) == "flux-haley-en"
@@ -192,7 +228,7 @@ async def test_non_english_never_resolves_to_flux(
     """
     entity_id = await setup_entry(hass, mock_config_entry)
 
-    await speak_through_hass(hass, entity_id, f"Hola en {language}.", language=language)
+    await speak_batch(hass, entity_id, f"Hola en {language}.", language=language)
 
     model = sent_model(aioclient_mock)
     assert model.startswith("aura")
@@ -210,7 +246,7 @@ async def test_per_call_voice_option_overrides_the_entry(
     entity_id = await setup_entry(hass, mock_config_entry)
     assert mock_config_entry.options[CONF_VOICE] == DEFAULT_VOICE
 
-    await speak_through_hass(
+    await speak_batch(
         hass, entity_id, "Otra voz.", language="es", options={ATTR_VOICE: AURA_ES_VOICE}
     )
 
@@ -225,7 +261,7 @@ async def test_returned_audio_is_byte_identical(
     """The do-not-re-encode regression test. Also that the ID3 tag survives untouched."""
     entity_id = await setup_entry(hass, mock_config_entry)
 
-    extension, audio = await speak_through_hass(hass, entity_id, "Byte for byte.")
+    extension, audio = await speak_batch(hass, entity_id, "Byte for byte.")
 
     assert extension == "mp3"
     assert audio == FAKE_AUDIO
@@ -241,7 +277,7 @@ async def test_speed_reaches_the_query_for_flux(
 ) -> None:
     entity_id = await setup_entry(hass, mock_config_entry)
 
-    await speak_through_hass(hass, entity_id, "Faster.", options={CONF_SPEED: 1.15})
+    await speak_batch(hass, entity_id, "Faster.", options={CONF_SPEED: 1.15})
 
     _, url, _, _ = last_speak(aioclient_mock)
     assert url.query["model"] == DEFAULT_VOICE
@@ -257,9 +293,7 @@ async def test_speed_is_not_sent_for_aura(
     """Aura has no speed parameter, so sending one is meaningless whoever drops it."""
     entity_id = await setup_entry(hass, mock_config_entry)
 
-    await speak_through_hass(
-        hass, entity_id, "Mas despacio.", language="es", options={CONF_SPEED: 1.15}
-    )
+    await speak_batch(hass, entity_id, "Mas despacio.", language="es", options={CONF_SPEED: 1.15})
 
     _, url, _, _ = last_speak(aioclient_mock)
     assert url.query["model"] == AURA_ES_VOICE
@@ -271,7 +305,13 @@ async def test_configured_speed_is_the_default_option(
     mock_api: None,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """A speed set in the options flow applies without every call repeating it."""
+    """A speed set in the options flow applies without every call repeating it.
+
+    Two assertions, because the merging happens in two different places. The entity advertises
+    the configured speed in `default_options`, which is what the tts manager merges into every
+    call. A direct call to `async_get_tts_audio` skips that merge, since it is the manager's
+    job, so the second assertion passes the merged value explicitly.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Deepgram Flux (Haley)",
@@ -280,7 +320,9 @@ async def test_configured_speed_is_the_default_option(
     )
     entity_id = await setup_entry(hass, entry)
 
-    await speak_through_hass(hass, entity_id, "Configured speed.")
+    assert loaded_entity(hass, entity_id).default_options[CONF_SPEED] == 0.9
+
+    await speak_batch(hass, entity_id, "Configured speed.", options={CONF_SPEED: 0.9})
 
     assert last_speak(aioclient_mock)[1].query["speed"] == "0.9"
 
@@ -295,7 +337,7 @@ async def test_preferred_format_wav_asks_for_linear16_in_a_wav_container(
     aioclient_mock.post(URL_SPEAK_FLUX, content=FAKE_AUDIO, headers={"Content-Type": "audio/wav"})
     entity_id = await setup_entry(hass, mock_config_entry)
 
-    extension, audio = await speak_through_hass(
+    extension, audio = await speak_batch(
         hass, entity_id, "In a wav.", options={ATTR_PREFERRED_FORMAT: "wav"}
     )
 
@@ -388,19 +430,24 @@ async def test_supported_voices_is_none_for_an_unknown_language(
     assert entity.async_get_supported_voices("pt") is None
 
 
-async def test_streaming_input_is_not_supported_yet(
+async def test_streaming_input_is_supported_and_that_is_the_opt_in(
     hass: HomeAssistant, catalog: VoiceCatalog, mock_config_entry: MockConfigEntry
 ) -> None:
-    """The guard on chapter 6.
+    """Chapter 5's guard, inverted by chapter 6, and kept for the same reason.
 
     Home Assistant auto-detects streaming by comparing the subclass method against the base
-    one, so defining async_stream_tts_audio at all is the opt-in. Chapter 5 has no websocket,
-    so this must read False, and this test is expected to fail when chapter 6 lands.
+    one, so defining `async_stream_tts_audio` at all is the opt-in. Until chapter 6 this read
+    False and the assertion was that the method did not exist.
+
+    It stays in the suite inverted rather than being deleted, because the fact it pins has not
+    changed: this one method's existence decides how every Assist response is served. If it is
+    ever removed or renamed, streaming silently turns off and every pipeline quietly reverts to
+    batch with nothing failing.
     """
     entity = build_entity(hass, catalog, mock_config_entry)
 
-    assert entity.async_supports_streaming_input() is False
-    assert "async_stream_tts_audio" not in vars(DeepgramTTSEntity)
+    assert entity.async_supports_streaming_input() is True
+    assert "async_stream_tts_audio" in vars(DeepgramTTSEntity)
 
 
 async def test_two_entries_get_distinguishable_entity_ids(
@@ -425,33 +472,3 @@ async def test_two_entries_get_distinguishable_entity_ids(
         "tts.deepgram_flux_haley",
         "tts.deepgram_aura_celeste",
     }
-
-
-async def test_tts_speak_service_round_trip(
-    hass: HomeAssistant,
-    mock_api: None,
-    aioclient_mock: AiohttpClientMocker,
-    mock_config_entry: MockConfigEntry,
-) -> None:
-    """The real service, end to end: tts.speak, then fetch the stream it handed the player."""
-    entity_id = await setup_entry(hass, mock_config_entry)
-    played = async_mock_service(hass, "media_player", "play_media")
-
-    await hass.services.async_call(
-        "tts",
-        "speak",
-        {
-            "entity_id": entity_id,
-            "media_player_entity_id": "media_player.kitchen",
-            "message": "Your appointment is confirmed for 3pm tomorrow.",
-            "cache": False,
-        },
-        blocking=True,
-    )
-
-    assert len(played) == 1
-    extension, audio = await async_get_media_source_audio(hass, played[0].data["media_content_id"])
-
-    assert extension == "mp3"
-    assert audio == FAKE_AUDIO
-    assert sent_model(aioclient_mock) == DEFAULT_VOICE

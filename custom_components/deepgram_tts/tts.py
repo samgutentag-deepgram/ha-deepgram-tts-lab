@@ -1,18 +1,20 @@
 """Text to speech support for Deepgram.
 
-Chapter 5 of the build: the batch path. `async_get_tts_audio` resolves a voice out of the
-merged catalog and posts once to `/v2/speak` for Flux or `/v1/speak` for Aura.
+Two paths. `async_get_tts_audio` posts once and returns a whole clip. `async_stream_tts_audio`
+opens the Flux websocket, forwards each chunk of the message as it arrives, and yields audio
+frames while the text is still coming in.
 
-`async_stream_tts_audio` is deliberately absent. Home Assistant detects streaming support by
-comparing `self.__class__.async_stream_tts_audio` against the base method, so defining it here
-at all, even as a stub that raises, would route every Assist pipeline response down a websocket
-path that does not exist yet, while direct `tts.speak` calls kept working and hid the breakage.
-That is exactly how the integration this project replaces shipped broken. Chapter 6 adds the
-method and the socket client behind it in the same commit, on its own branch.
+**Defining `async_stream_tts_audio` is itself the opt-in.** Home Assistant detects streaming
+support by comparing `self.__class__.async_stream_tts_audio` against the base method, so the
+moment this method exists every Assist pipeline response routes down it, while direct
+`tts.speak` calls keep using the batch path and hide any breakage. That is exactly how the
+integration this project replaces shipped broken, and it is why this method landed on its own
+branch after the batch path was proven on real hardware rather than alongside it.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, AsyncIterator
 import logging
 from typing import Any
 
@@ -20,6 +22,8 @@ from homeassistant.components.tts import (
     ATTR_PREFERRED_FORMAT,
     ATTR_VOICE,
     TextToSpeechEntity,
+    TTSAudioRequest,
+    TTSAudioResponse,
     TtsAudioType,
     Voice,
 )
@@ -41,9 +45,12 @@ from .const import (
     FAMILY_FLUX,
     MANUFACTURER,
     PREFERRED_FORMAT_PARAMS,
+    STREAM_CONTAINER,
+    STREAM_ENCODING,
+    STREAM_EXTENSION,
 )
-from .errors import DeepgramError
-from .models import VoiceCatalog, family_for_model
+from .errors import DeepgramConnectionError, DeepgramError
+from .models import VoiceCatalog, VoiceInfo, family_for_model
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -173,3 +180,146 @@ class DeepgramTTSEntity(TextToSpeechEntity):
         # _async_convert_audio when the requested format differs from what came back, and a
         # transcode per spoken sentence on a Raspberry Pi buys nothing.
         return result.extension, result.audio
+
+    async def async_stream_tts_audio(self, request: TTSAudioRequest) -> TTSAudioResponse:
+        """Stream audio while the message is still arriving.
+
+        The extension has to be declared before the first byte is fetched, and the socket may
+        fail at any point, so both the socket and the batch fallback produce WAV. Nothing has
+        to be reconciled later and Home Assistant converts once if the pipeline wanted
+        something else.
+
+        WAV is also the format the playback devices want. An ESPHome voice satellite with the
+        speaker flag hard-refuses anything else with "Only WAV audio can be streamed", so this
+        is not only the easiest container to emit from raw frames.
+        """
+        options = request.options or {}
+        preferred = options.get(ATTR_VOICE) or self._voice_id
+        voice = resolve_voice(self._catalog, request.language, preferred)
+        if voice is None:
+            raise DeepgramError(
+                f"No Deepgram voice in the merged catalog can speak {request.language!r}"
+            )
+
+        speed = options.get(CONF_SPEED) if voice.is_flux else None
+
+        if not voice.is_flux:
+            # Aura has no socket at all. Settled decision 5: fall back to batch rather than
+            # refuse, so a Spanish pipeline still speaks.
+            _LOGGER.debug(
+                "%s is not a Flux voice, streaming turn served from batch", voice.voice_id
+            )
+            data_gen = self._batch_stream(voice, request.message_gen, speed, reason=None)
+        else:
+            data_gen = self._socket_stream(voice, request.message_gen, speed)
+
+        return TTSAudioResponse(extension=STREAM_EXTENSION, data_gen=data_gen)
+
+    async def _socket_stream(
+        self, voice: VoiceInfo, message_gen: AsyncIterator[str], speed: float | None
+    ) -> AsyncGenerator[bytes]:
+        """Yield the turn off the Flux socket, degrading to batch rather than raising.
+
+        Two failure windows, and they need different answers. Before any audio has reached the
+        caller, the whole turn can still be served from the batch endpoint and nobody hears a
+        difference. Once audio has gone out, a batch clip would arrive with its own WAV header
+        behind the one already sent, so the turn ends where it ends and the log says why.
+        """
+        consumed: list[str] = []
+        socket = self._client.stream(model=voice.voice_id, speed=speed)
+
+        header: bytes | None = None
+        audio_started = False
+
+        try:
+            async for frame in socket.stream(_tee(message_gen, consumed)):
+                # The socket yields its WAV header before the first audio frame, and a header
+                # already sent is what makes a clean fallback impossible. Hold it until audio
+                # actually exists. It costs 44 bytes of delay and buys the fallback window.
+                if not audio_started and socket.metrics.first_frame_ms is None:
+                    header = frame
+                    continue
+                if not audio_started:
+                    audio_started = True
+                    if header is not None:
+                        yield header
+                        header = None
+                yield frame
+        except DeepgramConnectionError as err:
+            if audio_started:
+                _LOGGER.warning(
+                    "Flux socket dropped after %d bytes of audio, ending the turn early: %s",
+                    socket.metrics.audio_bytes,
+                    err,
+                )
+                return
+            _LOGGER.warning("Flux socket failed before any audio, serving from batch: %s", err)
+            fallback = self._batch_stream(
+                voice, message_gen, speed, reason=str(err), consumed=consumed
+            )
+            async for frame in fallback:
+                yield frame
+            return
+
+        if socket.metrics.first_frame_ms is not None:
+            _LOGGER.debug(
+                "Flux socket turn: first frame %.0f ms, complete %.0f ms, %d bytes, %d chunks",
+                socket.metrics.first_frame_ms,
+                socket.metrics.metadata_ms or 0,
+                socket.metrics.audio_bytes,
+                socket.metrics.chunks_sent,
+            )
+
+    async def _batch_stream(
+        self,
+        voice: VoiceInfo,
+        message_gen: AsyncIterator[str],
+        speed: float | None,
+        *,
+        reason: str | None,
+        consumed: list[str] | None = None,
+    ) -> AsyncGenerator[bytes]:
+        """Serve a streaming request from the batch endpoint as one WAV.
+
+        `consumed` holds whatever the socket already pulled off `message_gen` before it failed.
+        Draining the rest of a generator whose consumer was cancelled mid-iteration can leave it
+        in a state that raises, so a failure to drain costs the tail of the sentence rather than
+        the whole turn.
+        """
+        parts: list[str] = list(consumed or [])
+        try:
+            async for chunk in message_gen:
+                parts.append(chunk)
+        except (RuntimeError, StopAsyncIteration) as err:
+            _LOGGER.warning(
+                "Could not read the rest of the message after a socket failure, "
+                "speaking the %d chunks already received: %s",
+                len(parts),
+                err,
+            )
+
+        text = "".join(parts)
+        if not text:
+            _LOGGER.warning("Nothing left to synthesize for this turn (reason: %s)", reason)
+            return
+
+        result = await self._client.async_synthesize(
+            text,
+            model=voice.voice_id,
+            encoding=STREAM_ENCODING,
+            container=STREAM_CONTAINER,
+            speed=speed,
+        )
+        yield result.audio
+
+
+async def _tee(source: AsyncIterator[str], sink: list[str]) -> AsyncGenerator[str]:
+    """Forward each chunk immediately while keeping a copy for a possible batch fallback.
+
+    This is not the buffering HANDOFF section 2.2 warns about. Nothing waits: each chunk is
+    yielded the moment it arrives. The copy exists only because `message_gen` is single use, so
+    a fallback that has to re-synthesize the turn has no other way to know what the text was.
+    """
+    async for chunk in source:
+        sink.append(chunk)
+        yield chunk
