@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Deepgram",
+        "description": "Paste a Deepgram API key. Create one at console.deepgram.com.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "Used for synthesis requests. The voice catalogs are public and need no key."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Deepgram rejected that API key.",
+      "cannot_connect": "Could not reach api.deepgram.com.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Deepgram voice is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Deepgram TTS options",
+        "data": {
+          "voice": "Voice",
+          "speed": "Speaking rate"
+        },
+        "data_description": {
+          "speed": "Flux voices only. Aura voices ignore this."
+        }
+      }
+    }
+  }
+}

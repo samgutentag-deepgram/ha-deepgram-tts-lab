@@ -1,0 +1,54 @@
+[project]
+name = "ha-deepgram-tts"
+version = "0.1.0"
+description = "Deepgram Flux text to speech for Home Assistant"
+requires-python = ">=3.14"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["custom_components", "tests"]
+# ruff formats python blocks inside markdown; HANDOFF.md is prose and stays as written.
+extend-exclude = ["*.md", ".venv"]
+
+[tool.ruff.lint]
+select = [
+  "A",    # builtin shadowing
+  "ASYNC",
+  "B",    # bugbear
+  "C4",
+  "D",    # docstrings
+  "E",
+  "F",
+  "I",    # import sorting
+  "N",
+  "PGH",  # blanket noqa and type ignore
+  "PTH",
+  "RUF",
+  "SIM",
+  "T20",  # no print in the integration
+  "TRY",  # exception handling antipatterns
+  "UP",
+  "W",
+]
+ignore = [
+  "D203",   # conflicts with D211
+  "D213",   # conflicts with D212
+  "TRY003", # our typed errors carry the message on purpose
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D103", "D401", "S101"]
+"scripts/*" = ["T20", "D100", "D103"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

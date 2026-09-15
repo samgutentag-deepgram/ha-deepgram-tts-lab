@@ -12,3 +12,7 @@ coverage.xml
 
 # derived spec/plan review copies (render from the .md)
 docs/superpowers/**/*.html
+
+# local live-API checks write here
+scripts/out/
+.venv/

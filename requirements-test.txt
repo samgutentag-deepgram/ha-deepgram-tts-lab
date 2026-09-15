@@ -1,0 +1,8 @@
+# Pinned to the release that tracks Home Assistant 2026.9.x. Bump this and the hacs.json
+# homeassistant floor together, never separately.
+pytest-homeassistant-custom-component==0.13.365
+ruff==0.16.7
+
+# Belongs to homeassistant.components.tts, which HA installs at runtime and the test harness
+# does not. It is not ours, so it must not appear in manifest.json requirements.
+mutagen==1.47.0

@@ -1,0 +1,12 @@
+{
+  "domain": "deepgram_tts",
+  "name": "Deepgram TTS",
+  "codeowners": ["@samgutentag"],
+  "config_flow": true,
+  "documentation": "https://github.com/samgutentag-deepgram/ha-deepgram-tts",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/samgutentag-deepgram/ha-deepgram-tts/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
