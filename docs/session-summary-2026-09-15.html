@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepgram Flux TTS for Home Assistant: session summary</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+
+  /* Diagrams. Every stroke is a token or currentColor so they survive dark mode and print,
+     and nothing carries meaning by colour alone: each state also has a label. */
+  figure { margin: 1.6rem 0; page-break-inside: avoid; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-family: system-ui, sans-serif; font-size: 0.83rem; color: var(--faint);
+    margin-top: 0.45rem; }
+  .dg-box { fill: var(--setup-bg); stroke: var(--rule); stroke-width: 1.5; }
+  .dg-box-live { fill: var(--setup-bg); stroke: var(--text); stroke-width: 2; }
+  .dg-box-held { fill: none; stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .dg-box-block { fill: var(--watch-bg); stroke: var(--watch-border); stroke-width: 2; }
+  .dg-t { fill: var(--text); font-family: system-ui, sans-serif; font-size: 13px; }
+  .dg-t.sm { font-size: 11px; }
+  .dg-t.xs { font-size: 10px; }
+  .dg-t.bold { font-weight: 700; }
+  .dg-t.mid { text-anchor: middle; }
+  .dg-t.end { text-anchor: end; }
+  .dg-t.mono { font-family: 'SF Mono', ui-monospace, Menlo, monospace; }
+  .dg-t.muted { fill: var(--faint); }
+  .dg-line { stroke: var(--text); stroke-width: 1.5; fill: none; }
+  .dg-line.soft { stroke: var(--rule); }
+  .dg-line.dash { stroke-dasharray: 4 3; }
+  .dg-fill { fill: var(--text); }
+  .dg-accent { stroke: var(--watch-border); stroke-width: 2.5; fill: none; }
+
+  .asknow { border: 2px solid var(--watch-border); background: var(--watch-bg);
+    border-radius: 6px; padding: 0.9rem 1.1rem; margin: 1.2rem 0; page-break-inside: avoid; }
+  .asknow h3 { margin-top: 0; }
+  .asknow ol { margin-bottom: 0.2rem; }
+  .tag { font-family: system-ui, sans-serif; font-size: 0.72rem; letter-spacing: 0.05em;
+    text-transform: uppercase; border: 1px solid var(--rule); border-radius: 3px;
+    padding: 0.05em 0.4em; color: var(--muted); white-space: nowrap; }
+  .num { font-family: 'SF Mono', ui-monospace, Menlo, monospace; }
+
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<h1>Deepgram Flux TTS for Home Assistant</h1>
+<p class="meta" style="margin-top:0.3rem">Session summary &middot; 2026-09-15 &middot; branch <code>main</code> at 42 commits &middot; 120 tests green against real Home Assistant 2026.9.2</p>
+
+<p>A Home Assistant custom integration that makes Deepgram Flux TTS the voice of a Home
+Assistant voice assistant now exists, installs, picks a voice out of a 138 voice catalog, and
+synthesizes. It has never spoken out loud, because there is no Deepgram API key on this machine
+and there is no speaker in your house. Those are the two things that stand between this and a
+demo, and neither is a code problem.</p>
+
+<div class="asknow">
+<h3>Five things only you can do</h3>
+<ol>
+<li><strong>Put a Deepgram API key in the environment.</strong> One key unblocks three separate
+things, including the only number the whole campaign rests on.</li>
+<li><strong>Order hardware.</strong> Longest lead item in the project, and it is the first thing
+to start because everything visual waits on it. The recommendation is two Voice Preview Edition
+pucks at $58.95 each plus a $42.74 powered speaker. Full bill of materials in
+<code>docs/hardware-bom.html</code>.</li>
+<li><strong>Answer three questions about your Home Assistant instance:</strong> install type,
+hostname, and which apps are installed. Listed verbatim in <code>docs/deploy-notes.md</code>.
+Thirty seconds to answer, an hour to guess wrong.</li>
+<li><strong>Say go on the Asana project.</strong> <code>project-hub init</code> creates a team
+visible project plus four tasks, one of which needs a check-back date only you can pick. It was
+not worth guessing while you were out. Everything else in <code>.hub/</code> is done and works
+without it.</li>
+<li><strong>Nothing on advocacy intake.</strong> That is not waiting on a decision, it is waiting
+on chapter 5 making a sound. Every fact, angle, outline, draft and script is staged in
+<code>advocacy/prep/</code> so intake is a short job instead of a cold start.</li>
+</ol>
+</div>
+
+<h2>Where the code is</h2>
+
+<figure>
+<svg viewBox="0 0 880 210" role="img" aria-label="Seven build chapters. One through five are on main and tested. Six is written and held on a branch behind a hardware gate. Seven is partly done: docs written, no release tag."><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="dg-fill"/></marker></defs>
+<text class="dg-t sm bold" x="0" y="14">ON MAIN, 120 TESTS GREEN</text>
+<text class="dg-t sm bold" x="640" y="14">HELD</text>
+<rect class="dg-box-live" x="0" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="56" y="52">1</text>
+<text class="dg-t xs mid" x="56" y="70">Scaffold</text>
+<text class="dg-t xs mid muted" x="56" y="104">done</text>
+<line class="dg-line soft" x1="114" y1="57" x2="124" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box-live" x="126" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="182" y="52">2</text>
+<text class="dg-t xs mid" x="182" y="70">API client</text>
+<text class="dg-t xs mid muted" x="182" y="104">done</text>
+<line class="dg-line soft" x1="240" y1="57" x2="250" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box-live" x="252" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="308" y="52">3</text>
+<text class="dg-t xs mid" x="308" y="70">Catalog</text>
+<text class="dg-t xs mid muted" x="308" y="104">done</text>
+<line class="dg-line soft" x1="366" y1="57" x2="376" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box-live" x="378" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="434" y="52">4</text>
+<text class="dg-t xs mid" x="434" y="70">Config flow</text>
+<text class="dg-t xs mid muted" x="434" y="104">done</text>
+<line class="dg-line soft" x1="492" y1="57" x2="502" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box-live" x="504" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="560" y="52">5</text>
+<text class="dg-t xs mid" x="560" y="70">TTS batch</text>
+<text class="dg-t xs mid muted" x="560" y="104">done</text>
+<line class="dg-line soft" x1="618" y1="57" x2="628" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box-held" x="630" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="686" y="52">6</text>
+<text class="dg-t xs mid" x="686" y="70">TTS streaming</text>
+<text class="dg-t xs mid muted" x="686" y="104">on branch</text>
+<line class="dg-line soft" x1="744" y1="57" x2="754" y2="57" marker-end="url(#ar)"/>
+<rect class="dg-box" x="756" y="26" width="112" height="62" rx="6"/>
+<text class="dg-t bold mid" x="812" y="52">7</text>
+<text class="dg-t xs mid" x="812" y="70">Harden</text>
+<text class="dg-t xs mid muted" x="812" y="104">docs only</text>
+<rect class="dg-box-block" x="620" y="128" width="260" height="66" rx="6"/>
+<text class="dg-t sm bold" x="634" y="150">The gate between 5 and 6</text>
+<text class="dg-t xs" x="634" y="168">Chapter 5 running on your real instance,</text>
+<text class="dg-t xs" x="634" y="183">and a measured first-frame number.</text>
+<line class="dg-line" x1="690" y1="126" x2="690" y2="94" marker-end="url(#ar)"/>
+<text class="dg-t xs muted" x="0" y="150">Chapters 1 to 5 are a complete batch integration. It installs, picks a voice,</text>
+<text class="dg-t xs muted" x="0" y="165">and speaks. Chapter 6 is written, tested against a fake socket, and not merged,</text>
+<text class="dg-t xs muted" x="0" y="180">because defining one method turns streaming on for the whole house at once.</text>
+</svg>
+<figcaption>Chapters 1 to 5 are on main and tested. Chapter 6 is written, has 130 passing tests on its own branch, and is deliberately not merged.</figcaption>
+</figure>
+
+<p><strong>Chapter 6 is held for an engineering reason, not a procedural one.</strong> Home
+Assistant decides whether an integration streams by checking whether the class defines one
+method. Defining it <em>is</em> the opt-in. There is no flag, no config option, and no way to
+ship it half-built.</p>
+
+<figure>
+<svg viewBox="0 0 880 300" role="img" aria-label="Home Assistant decides whether to stream by comparing the class method against the base method. Defining async_stream_tts_audio is the opt-in; there is no flag. Direct tts.speak calls keep working on the batch path while every Assist pipeline response routes down the streaming path."><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="dg-fill"/></marker></defs>
+<rect class="dg-box" x="0" y="20" width="230" height="64" rx="6"/>
+<text class="dg-t sm bold" x="14" y="44">Home Assistant asks:</text>
+<text class="dg-t xs mono" x="14" y="64">self.__class__.async_stream_tts_audio</text>
+<text class="dg-t xs mono" x="14" y="78">is not TextToSpeechEntity....</text>
+<line class="dg-line" x1="232" y1="52" x2="300" y2="52" marker-end="url(#ar)"/>
+<text class="dg-t sm bold" x="310" y="30">Does the method exist?</text>
+<rect class="dg-box-live" x="310" y="42" width="250" height="52" rx="6"/>
+<text class="dg-t sm" x="324" y="64">NO, and that is chapter 5.</text>
+<text class="dg-t xs muted" x="324" y="82">Everything is served from batch.</text>
+<rect class="dg-box-block" x="310" y="112" width="250" height="52" rx="6"/>
+<text class="dg-t sm" x="324" y="134">YES, and that is the opt-in.</text>
+<text class="dg-t xs" x="324" y="152">There is no flag to turn it off.</text>
+<line class="dg-line" x1="562" y1="138" x2="620" y2="138" marker-end="url(#ar)"/>
+<rect class="dg-box" x="620" y="96" width="260" height="46" rx="6"/>
+<text class="dg-t sm" x="634" y="116">Direct <tspan class="dg-t sm mono">tts.speak</tspan></text>
+<text class="dg-t xs muted" x="634" y="133">keeps working. Looks healthy.</text>
+<rect class="dg-box-block" x="620" y="152" width="260" height="46" rx="6"/>
+<text class="dg-t sm bold" x="634" y="172">Every Assist response</text>
+<text class="dg-t xs" x="634" y="189">goes down the new path. Silently.</text>
+<line class="dg-line dash" x1="562" y1="126" x2="620" y2="114" marker-end="url(#ar)"/>
+<text class="dg-t sm bold" x="0" y="230">This happened to us, twice, with the warning open in another window.</text>
+<text class="dg-t xs muted" x="0" y="252">Adding the method broke 15 tests that had nothing to do with streaming: thirteen drove the same code path Home Assistant</text>
+<text class="dg-t xs muted" x="0" y="268">uses, so they were written as batch tests and had silently become fallback tests. In a test suite that is 15 red lines. In a</text>
+<text class="dg-t xs muted" x="0" y="284">house it is a voice assistant that stops answering while every check you would think to run still passes.</text>
+</svg>
+<figcaption>The trap that shipped the community integration broken. Direct service calls keep working, so every check you would think to run still passes.</figcaption>
+</figure>
+
+<p>So <code>main</code> stops at a complete batch integration that is safe to install on your
+real instance today, and chapter 6 waits on a branch behind a measured latency number. Chapter
+5's test suite asserts that streaming is off, so the assertion failing is the signal that the
+merge is a deliberate act rather than a side effect.</p>
+
+<h2>What one API key unblocks</h2>
+
+<figure>
+<svg viewBox="0 0 880 230" role="img" aria-label="One Deepgram API key in the environment unblocks three things at once: the chapter 2 authenticated round trip, the speed parameter question, and the first-frame latency measurement that the whole campaign rests on."><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="dg-fill"/></marker></defs>
+<rect class="dg-box-block" x="0" y="70" width="220" height="70" rx="6"/>
+<text class="dg-t bold" x="16" y="98">One API key</text>
+<text class="dg-t xs mono" x="16" y="118">DEEPGRAM_API_KEY</text>
+<text class="dg-t xs" x="16" y="133">in the environment</text>
+<rect class="dg-box" x="360" y="14" width="520" height="62" rx="6"/>
+<text class="dg-t sm bold" x="376" y="34">The first authenticated request</text>
+<text class="dg-t xs mono muted" x="376" y="51">scripts/live_check.py</text>
+<text class="dg-t xs muted" x="376" y="67">Nothing past Deepgram's auth check has ever run.</text>
+<line class="dg-line" x1="222" y1="105" x2="358" y2="45" marker-end="url(#ar)"/>
+<rect class="dg-box" x="360" y="90" width="520" height="62" rx="6"/>
+<text class="dg-t sm bold" x="376" y="110">Does speed get range checked?</text>
+<text class="dg-t xs mono muted" x="376" y="127">speed=1.37, off the 0.05 grid</text>
+<text class="dg-t xs muted" x="376" y="143">The options slider step depends on the answer.</text>
+<line class="dg-line" x1="222" y1="105" x2="358" y2="121" marker-end="url(#ar)"/>
+<rect class="dg-box" x="360" y="166" width="520" height="62" rx="6"/>
+<text class="dg-t sm bold" x="376" y="186">The only real number we have</text>
+<text class="dg-t xs mono muted" x="376" y="203">scripts/measure_first_frame.py</text>
+<text class="dg-t xs muted" x="376" y="219">The whole streaming argument rests on it.</text>
+<line class="dg-line" x1="222" y1="105" x2="358" y2="197" marker-end="url(#ar)"/>
+</svg>
+<figcaption>Nothing past Deepgram auth has ever run. The unauthenticated half is verified: both public catalogs were re-fetched live and every count in the handoff held.</figcaption>
+</figure>
+
+<h2>How this got built</h2>
+
+<figure>
+<svg viewBox="0 0 880 250" role="img" aria-label="How the session was run. Chapter one and the shared types were built by hand, then an interface contract froze every module boundary, then ten agents ran in parallel git worktrees with one owner per file, then each branch merged back into main."><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="dg-fill"/></marker></defs>
+<rect class="dg-box-live" x="0" y="90" width="150" height="60" rx="6"/>
+<text class="dg-t sm bold" x="14" y="114">Chapter 1</text>
+<text class="dg-t xs muted" x="14" y="131">by hand, plus the</text>
+<text class="dg-t xs muted" x="14" y="144">shared types</text>
+<line class="dg-line" x1="152" y1="120" x2="196" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box-block" x="198" y="82" width="170" height="76" rx="6"/>
+<text class="dg-t sm bold" x="212" y="104">Interface contract</text>
+<text class="dg-t xs" x="212" y="122">Every signature frozen.</text>
+<text class="dg-t xs" x="212" y="137">One owner per file.</text>
+<text class="dg-t xs muted" x="212" y="152">40 minutes, paid up front.</text>
+<rect class="dg-box" x="420" y="6" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="24">chapters 2 and 3</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="19" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="19" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="40" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="58">chapters 4 and 5</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="53" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="53" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="74" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="92">hardware research</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="87" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="87" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="108" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="126">deployment tooling</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="121" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="121" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="142" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="160">content and scripts</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="155" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="155" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="176" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="194">ELI5 diagrams</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="189" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="189" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box" x="420" y="210" width="230" height="26" rx="4"/>
+<text class="dg-t xs" x="432" y="228">adversarial review</text>
+<line class="dg-line soft" x1="370" y1="120" x2="418" y2="223" marker-end="url(#ar)"/>
+<line class="dg-line soft" x1="652" y1="223" x2="700" y2="120" marker-end="url(#ar)"/>
+<rect class="dg-box-live" x="702" y="90" width="178" height="60" rx="6"/>
+<text class="dg-t sm bold" x="716" y="114">main</text>
+<text class="dg-t xs muted" x="716" y="131">41 commits, clean</text>
+<text class="dg-t xs muted" x="716" y="144">merges, no conflicts</text>
+<text class="dg-t xs muted" x="420" y="248">Disjoint file ownership by construction, so merging was a fast-forward of new files rather than conflict resolution.</text>
+</svg>
+<figcaption>Ten agents in parallel git worktrees, behind an interface contract written before any of them started. Each was asked to report anything in the contract that turned out wrong, and six gaps came back.</figcaption>
+</figure>
+
+<h2>The hardware, which was the gap nobody had researched</h2>
+
+<p>Home Assistant is about physical devices, and a text to speech integration with nothing to
+play audio out of is a unit test. You own zero speakers and zero microphones today, so this was
+researched from scratch with current prices and buy links.</p>
+
+<figure>
+<svg viewBox="0 0 880 230" role="img" aria-label="Three hardware tiers. Bench at twelve dollars fifty gets a media player on the Home Assistant host. One room hands free at fifty eight ninety five is a single Home Assistant Voice Preview Edition. Two rooms on camera at one hundred sixty three fourteen adds a second puck and a powered speaker."><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="dg-fill"/></marker></defs>
+<rect class="dg-box" x="120" y="150" width="760" height="44" rx="6"/>
+<text class="dg-t bold mono end" x="108" y="177">$0</text>
+<text class="dg-t sm bold" x="136" y="169">Browser player</text>
+<text class="dg-t xs muted" x="136" y="186">Proves the integration speaks. Proves nothing about a house.</text>
+<rect class="dg-box" x="120" y="118" width="760" height="44" rx="6"/>
+<text class="dg-t bold mono end" x="108" y="145">$12.50</text>
+<text class="dg-t sm bold" x="136" y="137">Bench</text>
+<text class="dg-t xs muted" x="136" y="154">A USB speaker plus the VLC app, so the HA host has a real media_player.</text>
+<rect class="dg-box" x="120" y="74" width="760" height="44" rx="6"/>
+<text class="dg-t bold mono end" x="108" y="101">$58.95</text>
+<text class="dg-t sm bold" x="136" y="93">One room, hands free</text>
+<text class="dg-t xs muted" x="136" y="110">One Voice Preview Edition. One line item, because padding it would be dishonest.</text>
+<rect class="dg-box" x="120" y="20" width="760" height="44" rx="6"/>
+<text class="dg-t bold mono end" x="108" y="47">$163.14</text>
+<text class="dg-t sm bold" x="136" y="39">Two rooms, on camera</text>
+<text class="dg-t xs muted" x="136" y="56">Two pucks, a powered speaker, a cable. This is the tier a video needs.</text>
+<text class="dg-t xs muted" x="120" y="212">Prices checked 2026-09-15. The Raspberry Pi tier was researched and dropped: rhasspy/wyoming-satellite is archived and read only.</text>
+</svg>
+<figcaption>Three tiers plus a free one. The cheapest path to hearing Flux speak is zero dollars and it cannot demonstrate anything about a house.</figcaption>
+</figure>
+
+<p>Two findings changed the recommendation. <strong><code>rhasspy/wyoming-satellite</code> is
+archived and read only</strong>, last push January, 212 open issues abandoned, and every "build a
+Pi voice satellite" tutorial on the internet still points at it. That deleted the Raspberry Pi
+tier. And an ESPHome voice satellite advertising the speaker flag <strong>hard-refuses anything
+that is not WAV</strong>, which means a design decision made for software reasons turned out to be
+the only one the hardware accepts.</p>
+
+<h2>The five findings worth reading the ledger for</h2>
+
+<p><code>.hub/ledger.md</code> has 48 entries. These are the ones that will end up in a post.</p>
+
+<h3>1. We shipped the exact bug we founded the project on avoiding</h3>
+<p>The handoff's first and heaviest rule: never let a broad handler turn your own auth error into
+something else, because then a caller cannot tell an expired key from a dead network. Every error
+path in the API client honors it. And then the websocket client did it anyway, because a rejected
+key fails the <em>HTTP upgrade</em>, which arrives as a connection error class, not as an
+authentication error. An adversarial review found it. The rule was written down, understood, and
+broken in the one place where the failure arrives through a transport nobody was picturing.</p>
+
+<h3>2. Two things with prose explaining why they mattered had no test at all</h3>
+<p>Mutation testing planted 15 defects and the suite caught 13. The two it missed both had ledger
+entries behind them. Deleting the guard that keeps a Spanish pipeline off an English voice left
+every test passing, because the fixture gave each language exactly one voice, so two different
+behaviors produced the same answer. <strong>A test whose fixture makes the right and wrong
+implementations agree is not a test, and it reads exactly like one.</strong></p>
+
+<h3>3. The handoff's headline claim about the old integration was wrong</h3>
+<p>It said an undeclared <code>async_timeout</code> import meant the community integration
+"almost certainly did not load at all." It almost certainly did load: <code>ha-ffmpeg</code>
+requires <code>async-timeout</code> with no version marker, and the TTS component depends on
+ffmpeg. The <code>pydub</code> half stands and is the real cause, which makes the actual bug more
+interesting than the one we thought we had. Six handoff claims have been corrected, in
+<code>docs/handoff-corrections.md</code>. The handoff itself was not edited, on purpose.</p>
+
+<h3>4. A display name that is good enough to show is not good enough to identify</h3>
+<p><code>display_name</code> is <code>null</code>, not missing, on 61 of the 102 Aura voices, so
+the obvious membership check does nothing and the fallback is the normal path. Then the fallback
+turned out to <em>collide</em>: two different live voices both render as "Asteria", same family,
+same accent. The voice picker labels carry the model id for that reason.</p>
+
+<h3>5. Entity IDs that read correctly next to a service that was dead</h3>
+<p>Chapter 1 set a naming attribute combination that produced exactly the entity IDs its own
+tests asserted, and made every synthesis fail with "TTS engine name is not set". The entity ID
+and the entity name come from different places, so a registry that looks right tells you nothing
+about whether the thing works. That is the second failure in this project that only the calling
+path surfaces, which makes it a pattern rather than a coincidence.</p>
+
+<h2>Content, staged but not started</h2>
+
+<p>The campaign cannot start, and the reason is worth stating plainly rather than treating as red
+tape: intake freezes a claim, the cycle refuses to run without a frozen one, and nothing has made
+a sound yet. What exists instead is every input the cycle needs.</p>
+
+<table>
+<thead><tr><th>Staged</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td><code>notes.md</code></td><td>70 facts across 11 themes, each tagged verified live, verified by reading source, vendor claim, or inferred</td></tr>
+<tr><td><code>angles.md</code></td><td>Seven angles ranked, with the unsupported ones named and the editorial risk called out</td></tr>
+<tr><td><code>blog-outlines.md</code></td><td>Two outlines, one per branch, with missing evidence marked per section</td></tr>
+<tr><td><code>blog-technical-draft.md</code></td><td>A full draft, de-slopped, with every unverified claim marked inline and no latency number anywhere</td></tr>
+<tr><td><code>video-plan.md</code></td><td>Six videos across three formats, with the hardware blocker named per video</td></tr>
+<tr><td><code>scripts/</code></td><td>Four scripts, same facts, four style contracts</td></tr>
+</tbody>
+</table>
+
+<p><strong>The strongest angle available today is not "Flux is fast."</strong> No latency has been
+measured, so that claim cannot be written. What is fully supported right now needs no hardware at
+all: the streaming opt-in trap, which any Home Assistant TTS author can fall into, and which we
+demonstrably fell into ourselves two hours after writing it down as a thing to avoid.</p>
+
+<p>One editorial risk, named early because it gets worse the longer it goes unnamed. The audit
+material is about a volunteer's open source project, and roughly fifteen named defects with line
+numbers is accurate and could still read as dunking. The framing has to be transferable lessons,
+and the credit has to be real. It is in <code>angles.md</code> with four concrete failure modes
+and one test every sentence has to pass.</p>
+
+<h2>The numbers</h2>
+
+<table>
+<thead><tr><th>Thing</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td>Commits on <code>main</code></td><td class="num">42</td></tr>
+<tr><td>Tests passing on <code>main</code>, against real Home Assistant 2026.9.2</td><td class="num">120</td></tr>
+<tr><td>Tests passing on <code>chapter-6-streaming</code></td><td class="num">130</td></tr>
+<tr><td>Python lines across the integration, tests, and scripts</td><td class="num">~4,900</td></tr>
+<tr><td>Ledger entries</td><td class="num">48</td></tr>
+<tr><td>Handoff claims corrected</td><td class="num">6</td></tr>
+<tr><td>Handoff claims re-verified against the installed Home Assistant</td><td class="num">36</td></tr>
+<tr><td>Confirmed defects found by the adversarial review, and fixed</td><td class="num">9</td></tr>
+<tr><td>Diagrams drawn</td><td class="num">20</td></tr>
+<tr><td>Agents run in parallel worktrees</td><td class="num">10</td></tr>
+<tr><td>Latency measurements taken</td><td class="num">0</td></tr>
+</tbody>
+</table>
+
+<p>That last row is the honest summary of the whole session. Everything that could be built
+without a key and without hardware is built and verified. Nothing that needs either one has been
+touched, and no number has been invented to cover the gap.</p>
+
+<h2>Where to go next</h2>
+
+<table>
+<thead><tr><th>Open this</th><th>For</th></tr></thead>
+<tbody>
+<tr><td><code>.hub/index.html</code></td><td>The hub. Every artifact in the project, one page, 32 tiles</td></tr>
+<tr><td><code>docs/hardware-bom.html</code></td><td>What to buy. Print it and shop from it</td></tr>
+<tr><td><code>docs/eli5-ha-flux-tts.html</code></td><td>Twelve diagrams on how the integration works</td></tr>
+<tr><td><code>docs/superpowers/build-plan.md</code></td><td>The three tracks and which of them is actually blocked</td></tr>
+<tr><td><code>docs/deploying.html</code></td><td>Getting it onto your instance, and a 39 item hand-check list</td></tr>
+<tr><td><code>docs/review/skeptic-pass-2026-09-15.md</code></td><td>The adversarial review, with reproduction scripts</td></tr>
+<tr><td><code>.hub/ledger.md</code></td><td>What actually happened, in order, with sources</td></tr>
+</tbody>
+</table>
+
+<p class="meta">Written at the end of the session that built chapters 1 through 6. Everything
+here is checkable against the repo. No latency figure appears anywhere in this document, because
+none has been measured, and the first one that exists will come out of
+<code>scripts/measure_first_frame.py</code> with the hardware named next to it.</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>
