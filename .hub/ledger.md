@@ -412,3 +412,107 @@ Switching Flux to Aura saves the voice, drops the stored speed, and reloads, and
 shows the right fields.
 Source: custom_components/deepgram_tts/config_flow.py · docs/chapter-4-notes.md
 Routes to: a contract revision, chapter 5
+
+### [friction] The entity ids were exactly right and every synthesis failed
+Symptom: chapter 1's naming assertions passed, the registry showed `tts.deepgram_flux_haley` and
+`tts.deepgram_aura_celeste` as intended, and then every call raised
+`HomeAssistantError("TTS engine name is not set.")` from `_async_generate_tts_audio`.
+Cause: chapter 1 set `_attr_has_entity_name = True` with `_attr_name = None`. That combination
+produces the entity id from the device name, which is why the ids looked correct, while
+`entity.name` stays `None`, and the tts manager refuses to synthesize without it. **The entity id
+and `entity.name` come from different places**, so a registry that reads correctly tells you
+nothing about whether the service works.
+Fix: `_attr_name = entry.title` plus `DeviceInfo(name=entry.title)`, which is what core's
+`google_cloud` TTS entity does. Both original entity ids still hold.
+This is the same shape as the streaming auto-detection trap in HANDOFF section 2.1: a failure
+only the calling path surfaces, invisible to anything that inspects state. Chapter 1's tests
+asserted on entity ids, which is exactly the check that cannot see it. Two of these in one
+project is a pattern, not a coincidence, and it is the most useful thing this build has to say
+to anyone writing a Home Assistant TTS entity.
+Source: custom_components/deepgram_tts/tts.py · docs/chapter-5-notes.md
+Routes to: technical blog post, and this is the strongest single section in it
+
+### [claim] HANDOFF section 2.1's headline verdict does not hold, and I checked it myself
+The handoff says `async_timeout` "is not in HA core requirements" and "nothing installs it, so
+the integration almost certainly did not load at all." That claim was going to be the opening
+line of a blog post.
+It is wrong. `ha-ffmpeg==3.2.2` requires `async-timeout` with **no environment marker**, while
+`aiohttp==3.14.3` and `bleak==3.0.2` both guard it behind `python_version < "3.11"`.
+`homeassistant/components/tts/manifest.json` declares `dependencies: ["http", "ffmpeg"]`, and
+`ffmpeg` requires `ha-ffmpeg`. So `async_timeout` is importable on every instance a TTS
+integration runs on, and it is present in this project's own test venv at 5.0.1.
+Found by the content agent while building the fact sheet, then re-verified here independently by
+enumerating `importlib.metadata.requires` across every installed distribution and reading the two
+manifests. Both runs agree.
+**The pydub half stands and is the real cause**, which makes the actual bug better than the one
+we thought we had: the integration loaded, direct `tts.speak` calls worked, and only the Assist
+pipeline failed. It looked healthy to anyone testing by hand.
+The transferable lesson is not the one we started with either. It is not "declare your imports or
+nothing installs them." It is that **an undeclared import which happens to resolve through
+somebody else's transitive dependency is worse than one that fails outright**, because it works
+until that dependency drops the marker, and then it breaks for reasons nobody can trace.
+Source: docs/handoff-corrections.md C1 · `.venv/bin/python` over importlib.metadata · installed tts and ffmpeg manifests
+Routes to: technical blog post, and it changes the opening
+
+### [claim] /v2/speak validates unknown fields before auth but not value ranges, and that half of section 3 was never probed
+HANDOFF section 3 says its parameter table was "enumerated by sending deliberately invalid values
+and reading the rejections," which is how `encoding` and `container` were established. Applied to
+`speed`, it does not work: `speed=3.0`, `speed=0.1`, and `speed=1.07` all return
+`401 INVALID_AUTH`, not 400.
+So the documented 0.5 to 1.5 range in 0.05 increments is from Deepgram's docs and is unverified.
+What does run pre-auth, confirmed with controls in the same batch: an unknown query parameter
+returns `400 INVALID_QUERY_PARAMETER`, and an Aura model on `/v2/speak` returns
+`400 V1_MODEL_ON_V2_SPEAK_ENDPOINT`. Schema shape is checked before credentials; parameter values
+are not.
+It held in the sense that matters: the two-endpoints finding the entire client design rests on is
+pre-auth and therefore genuinely probed. Only the numeric ranges were docs-sourced and presented
+as probed.
+`const.py`'s comment claimed the endpoint validates the range. Corrected to say where the range
+came from. Added to the first-API-key list: send `speed=1.37`, off the 0.05 grid, and record
+whether it is rejected or silently rounded, because the options-flow slider step depends on it.
+Source: docs/handoff-corrections.md C2 · six live requests with a dummy token, run twice by two sessions
+Routes to: technical blog post, the "probing an API before auth" section
+
+### [decision] ATTR_AUDIO_OUTPUT is advertised by nobody here, against the contract
+The interface contract told chapter 5 to advertise `ATTR_AUDIO_OUTPUT` in `supported_options`.
+It is not advertised, deliberately.
+Reason: it is free-form per integration, absent from HA's `_PREFFERED_FORMAT_OPTIONS`, never read
+by `_async_generate_tts_audio`, and the only two core consumers give it incompatible meanings.
+`cloud` uses `mp3` and `raw` and puts it in `default_options`; `wyoming` advertises it and ignores
+it. Advertising an option without honoring it lets a caller pass something that silently does
+nothing, which is worse than not offering it.
+Honoring it would be worse still: HA compares the returned extension against `preferred_format`
+only, so `audio_output: wav` with no `preferred_format` would produce WAV and then transcode it
+straight back to mp3. Two format knobs that disagree.
+Shipped: `[ATTR_VOICE, ATTR_PREFERRED_FORMAT, CONF_SPEED]`. Chapter 6 must not add it back
+without a defined value set.
+Source: custom_components/deepgram_tts/tts.py · docs/chapter-5-notes.md
+Routes to: a contract revision, and a gotchas post about the TTS options contract
+
+### [surprise] tts.speak never synthesizes anything, so a silent speaker is not evidence
+Expected: calling the `tts.speak` service to produce audio.
+Actual: it hands the media player a `media-source://tts/...` URL and returns. Synthesis happens
+only when something fetches that stream.
+Matters on real hardware more than in tests: a `tts.speak` call that returns cleanly and a
+speaker that stays silent is a **playback** problem, not a synthesis problem, and the natural
+next move of adding logging to the synthesis path is a wasted hour. Check whether the stream was
+fetched before checking whether it was generated.
+Related trap found the same way: HA's tts manager memory-caches on message plus language plus
+options plus engine, so two calls with the same message in one test replay the first result and
+never reach the entity. An API assertion after the second call passes against a stale call. Every
+chapter 5 test passes `cache=False` and a distinct message.
+Source: docs/chapter-5-notes.md · tests/test_tts.py
+Routes to: the real-hardware checklist, technical blog post, gotchas post
+
+### [asset] Twelve ELI5 diagrams and three animated SVGs
+`docs/eli5-ha-flux-tts.html` plus `docs/assets/streaming-vs-batch.svg`,
+`flush-boundaries.svg`, and `voice-resolution.svg`. Every stroke is a template CSS variable or
+`currentColor`, so all fifteen survive dark mode and print, and nothing carries meaning by color
+alone.
+The three animations exist because their subjects are about time. A still picture of streaming
+against batch shows two architectures; a shared time axis with a playhead shows why one of them
+is the point.
+Every voice id on the page was confirmed present in the live catalogs. The two time-axis diagrams
+use illustrative spacing, stated on the page, because no latency has been measured.
+Source: docs/eli5-ha-flux-tts.html · docs/assets/
+Routes to: both blog posts, video B-roll, the hub
