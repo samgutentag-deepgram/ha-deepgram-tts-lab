@@ -82,3 +82,51 @@ def aura_models_payload() -> dict:
 def anyio_backend() -> Generator[str]:
     """Run async tests on asyncio."""
     yield "asyncio"
+
+
+def _aura_entry(
+    name: str, canonical_name: str, languages: list[str], *, display_name: str | None = None
+) -> dict:
+    """One /v1/models tts entry.
+
+    display_name defaults to None because that is what the live catalog does for 61 of its
+    102 Aura entries: the key is present and the value is null.
+    """
+    return {
+        "name": name,
+        "canonical_name": canonical_name,
+        "architecture": "aura-2",
+        "languages": languages,
+        "version": "2025-04-01.0",
+        "metadata": {
+            "accent": "Neutral",
+            "age": "Adult",
+            "display_name": display_name,
+            "tags": ["feminine"],
+            "sample": f"https://example.invalid/{name}.wav",
+        },
+    }
+
+
+@pytest.fixture
+def multilingual_aura_payload() -> dict:
+    """A /v1/models response with one Aura voice per non-English language, plus English.
+
+    Settled decision 4 says a non-English pipeline must never resolve to Flux, and every Flux
+    voice is English, so that rule needs one Aura voice per language to be testable per
+    language rather than once.
+    """
+    return {
+        "stt": [],
+        "languages": {"en": "English", "es": "Spanish"},
+        "tts": [
+            _aura_entry("celeste", "aura-2-celeste-es", ["es", "es-CO"], display_name="Celeste"),
+            _aura_entry("elara", "aura-2-elara-de", ["de", "de-DE"], display_name="Elara"),
+            _aura_entry("agathe", "aura-2-agathe-fr", ["fr", "fr-FR"], display_name="Agathe"),
+            _aura_entry("daphne", "aura-2-daphne-nl", ["nl", "nl-NL"], display_name="Daphne"),
+            _aura_entry("cinzia", "aura-2-cinzia-it", ["it", "it-IT"], display_name="Cinzia"),
+            _aura_entry("fujin", "aura-2-fujin-ja", ["ja", "ja-JP"], display_name="Fujin"),
+            # display_name null on purpose, so the title-cased fallback is exercised.
+            _aura_entry("asteria", "aura-2-asteria-en", ["en", "en-US"]),
+        ],
+    }
