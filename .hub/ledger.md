@@ -362,3 +362,53 @@ exclusive. `pipefail` and arrays won; the shebang is `#!/usr/bin/env bash` and e
 so in its header.
 Source: docs/deploy-notes.md · `shellcheck not found`
 Routes to: chapter 7, and the pre-flip checklist
+
+### [surprise] The null display_name fallback collides on live data, not in theory
+The chapter 3 finding was that `metadata.display_name` is null on 61 of 102 Aura voices, so the
+title-cased bare `name` fallback is the normal path. Chapter 4 found the consequence: **the
+fallback is not unique.** Legacy `aura-asteria-en` and current `aura-2-asteria-en` both fall back
+to "Asteria", same family, same accent, so a label of name plus family plus accent shows a user
+two identical options.
+Not a hypothetical. Both voices are in the live `/v1/models` payload right now.
+Fix: the label carries the voice id, `Asteria (Aura, Neutral) [aura-2-asteria-en]`. The id is the
+catalog's own key so it always disambiguates, and it is also the model string the request sends,
+which is the thing a reader comparing this to Deepgram's docs actually wants to see. A test
+appends the legacy entry and asserts the two labels differ, that all 138 are unique, and that no
+label contains the string None.
+The general lesson, which is the part worth writing up: a fallback that is good enough to display
+is not automatically good enough to identify.
+Source: custom_components/deepgram_tts/config_flow.py · tests/test_config_flow.py::test_aura_fallback_label_is_usable_and_unique
+Routes to: technical blog post, and this is a strong standalone section
+
+### [decision] 138 voices in one dropdown, no language step, and sort explicitly off
+What lost: a language step before the voice picker, which would cut 138 options to a handful.
+What was chosen: one flat dropdown, all 138, ordered Flux first then English Aura then the rest
+grouped by base language.
+Three reasons, in order of weight. The configured voice is a **preference, not a constraint**:
+`resolve_voice` already refuses to send a Flux voice down a non-English pipeline and picks per
+request, so filtering the picker by language would filter on something the entity does not treat
+as binding. Home Assistant renders a dropdown select as a type-to-filter combo box, so "haley"
+or "-es" narrows it with zero extra clicks. And only 49 of 138 voices are non-English, so a
+language step taxes the common case to organize the rare one.
+`sort=False` is written out explicitly even though it is already the default, because frontend
+sorting would alphabetize the labels and silently destroy the Flux-first ordering the whole
+design rests on. That is the kind of default that changes in a minor release.
+Unverified and worth checking on the real instance: whether the frontend really renders 138
+options as a type-to-filter combo box. If it renders a flat 138 row list, this decision should
+be revisited, and it is a one step change.
+Source: custom_components/deepgram_tts/config_flow.py · docs/chapter-4-notes.md
+Routes to: the real-hardware checklist, user-facing blog post
+
+### [decision] The voice lives in options only, never in entry data
+Unspecified by the interface contract, which says the entry title is the voice and that options
+include the voice, without saying where the initial pick lands. `entry.data` holds only the API
+key. `entry.options` holds only the voice, with no seeded speed, so chapter 5 has to read speed
+as `options.get(CONF_SPEED, DEFAULT_SPEED)` and must not read `entry.data[CONF_VOICE]`.
+Recorded because a later chapter reading the wrong dict gets `None` and a confusing failure
+rather than an error.
+Related: speed visibility is driven by the voice **currently stored in options**, not the one
+being picked in the same form, because a form's schema is fixed before the user touches it.
+Switching Flux to Aura saves the voice, drops the stored speed, and reloads, and the next visit
+shows the right fields.
+Source: custom_components/deepgram_tts/config_flow.py · docs/chapter-4-notes.md
+Routes to: a contract revision, chapter 5
