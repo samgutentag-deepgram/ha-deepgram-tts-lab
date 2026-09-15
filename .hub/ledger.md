@@ -633,3 +633,90 @@ audio can be streamed." Settled decision 6 was right for a reason that was not k
 settled.
 Source: docs/hardware-bom.html · docs/hardware-notes.md
 Routes to: the buy list, user-facing blog post, video B-roll planning
+
+### [claim] We shipped the exact bug we founded the project on avoiding, and a review caught it
+HANDOFF section 2.2's first and heaviest do-not-repeat: do not let a broad handler turn your own
+auth error into something else, because a caller cannot then tell an expired key from a dead
+network. Every error path in `api.py` was built to honor that, and `api.py` came out of the
+skeptic review as the strongest file in the repo.
+And then `stream.py` did it anyway, on the primary path. A rejected key fails the **HTTP
+upgrade**, so it never produces an in-band `Error` frame. It arrives as
+`WSServerHandshakeError`, which is a `ClientError` subclass, so the generic handler turned it
+into `DeepgramConnectionError`. The test that looked like it covered this,
+`test_auth_shaped_server_error_raises_auth_error`, exercises an in-band error frame, which a
+real expired key almost certainly never sends.
+Worse on the chapter 6 branch than on main: the fallback catches exactly that class, so an
+expired key would have quietly retried the same dead key against `/v2/speak`, failed again, and
+reported whichever error came second. The cause hidden twice.
+Did not hold, and the interesting part is why. The rule was written down, understood, honored
+everywhere it was being thought about, and broken in the one place where the auth failure
+arrives through a transport nobody was picturing. **Knowing the rule is not the same as knowing
+where it applies**, and the only thing that closed the gap was somebody adversarially reading
+code they did not write.
+Fixed: handled ahead of `ClientError`, parametrized over 401 and 403, and `DeepgramAuthError`
+now propagates past the streaming fallback on purpose.
+Source: custom_components/deepgram_tts/stream.py · tests/test_stream.py::test_a_rejected_key_on_the_handshake_is_an_auth_error · docs/review/skeptic-pass-2026-09-15.md finding 1
+Routes to: technical blog post, and it is the honest ending the post needed
+
+### [claim] Two things with ledger entries behind them had no test, and deleting them stayed green
+Mutation testing planted 15 defects and the suite caught 13. The two it missed both had prose in
+this file explaining why they mattered.
+**Deleting the family guard from `resolve_voice` passed all 62 tests.** The six-language
+parametrize looked like it covered settled decision 4, and did not: its fixture gave each
+language exactly one voice and that voice was Aura, so "first non-Flux candidate" and "first
+candidate" were the same object. The guard could be removed without anything failing.
+**Deleting `await self._finish_sender(sender)` entirely passed all 62 tests.** Sixteen lines with
+a whole ledger entry behind them and zero coverage. `FakeSocket.closed` was tracked and never
+asserted.
+Both now have tests that fail when the code is removed. The transferable lesson, which is
+sharper than "write more tests": **a test whose fixture makes two different behaviors produce
+the same answer is not a test, and reads exactly like one.** The only way we found out was
+deleting the code and watching nothing break.
+Source: docs/review/skeptic-pass-2026-09-15.md findings 3 and 4 · tests/test_catalog.py::test_the_family_guard_is_load_bearing_for_every_language
+Routes to: technical blog post, the testing section, and a standalone post on mutation testing
+
+### [friction] ruff's own formatter emitted syntax that would have crashed CI
+Symptom: the CI `lint` job runs `python3 scripts/manifest_check.py`, which parses the integration
+with `ast`, and it would have crashed on the runner rather than reporting anything.
+Cause: `pyproject.toml` sets `target-version = "py314"`, so `ruff format` rewrote a
+parenthesized `except (DeepgramAuthError, DeepgramConnectionError):` into PEP 758's
+unparenthesized form. That is a `SyntaxError` on anything older than 3.14, and the job had no
+`setup-python` step, so it would have run on the runner's system interpreter.
+Fix: pin 3.14 in the lint job. The syntax is correct for this project and the formatter was
+right; the job was wrong about which interpreter it needed.
+Worth recording because the guard against undeclared imports is the one CI check this project
+most depends on, and it would have been silently broken on the very first push. Confirmed
+locally: `/usr/bin/python3` is 3.9.6 and cannot parse `stream.py`.
+Source: .github/workflows/validate.yml · docs/review/skeptic-pass-2026-09-15.md finding 6
+Routes to: technical blog post, a gotchas post about target-version
+
+### [decision] The chapter 6 merge gate does not test what it gates, and that is recorded not fixed
+`scripts/measure_first_frame.py` was written as the gate: produce a first-frame number on the
+real instance, then chapter 6 may merge. The review pointed out that the script **never imports
+`stream.py`.** It opens its own socket and talks to Deepgram directly, and its
+`degraded_cleanly` check exercises the batch endpoint rather than the entity's fallback.
+So satisfying the gate as written would produce a real, quotable latency number and would
+validate none of the code the gate exists to protect.
+Left unfixed on purpose, and the choice is worth stating. Rewriting the script to drive
+`FluxSocket` would make it depend on a Home Assistant import graph, which is the reason it is
+stdlib plus aiohttp and runnable on a bare Pi in one command. The better answer is a second gate
+step that runs on the instance with the branch deployed, which cannot be written until there is
+an instance to run it on.
+**A gate that does not test what it gates is worse than no gate**, because it converts a real
+check into a ritual. Written down so nobody mistakes the number for the verification.
+Source: docs/review/skeptic-pass-2026-09-15.md finding 12 · docs/chapter-6-notes.md
+Routes to: chapter 6's merge checklist, technical blog post
+
+### [correction] Two more corrections to entries above
+Append-only, so these are new entries rather than edits.
+**"Settled decision 4 survives a catalog that is wrong about itself" was false when written.** The
+entry described the last-resort branch's language guard accurately and then generalized it to the
+whole function. The preferred-voice branch was guarded on neither language nor family and trusted
+the catalog completely, and `resolve_voice(catalog, "es", "flux-rogue-es")` returned a Flux
+voice. Reproduced, not theorized. It is true now, and the fix is one `elif`.
+This one matters beyond the file: that sentence was headed for a blog post as a design win, and
+it would have been a claim a reader could falsify in four lines.
+**"17 socket tests" was 16.** The suite total of 62 was right. Current counts: main 120,
+`chapter-6-streaming` 130.
+Source: docs/review/skeptic-pass-2026-09-15.md · custom_components/deepgram_tts/catalog.py `resolve_voice`
+Routes to: the blog draft, which needs that sentence rewritten before it goes anywhere
