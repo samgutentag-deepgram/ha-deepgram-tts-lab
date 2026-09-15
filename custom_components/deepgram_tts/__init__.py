@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -23,8 +23,6 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.TTS]
 
-type DeepgramConfigEntry = Any  # narrowed in chapter 4 once the entry data shape is fixed
-
 
 @dataclass(slots=True)
 class DeepgramRuntimeData:
@@ -34,7 +32,11 @@ class DeepgramRuntimeData:
     catalog: VoiceCatalog
 
 
-async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
+type DeepgramConfigEntry = ConfigEntry[DeepgramRuntimeData]
+"""A config entry whose runtime_data is ours. Declared here so the platform can annotate it."""
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: DeepgramConfigEntry) -> bool:
     """Set up Deepgram TTS from a config entry."""
     session = async_get_clientsession(hass)
 
@@ -54,11 +56,11 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: DeepgramConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def _async_reload_entry(hass: HomeAssistant, entry) -> None:
+async def _async_reload_entry(hass: HomeAssistant, entry: DeepgramConfigEntry) -> None:
     """Reload the entry when its options change."""
     await hass.config_entries.async_reload(entry.entry_id)
