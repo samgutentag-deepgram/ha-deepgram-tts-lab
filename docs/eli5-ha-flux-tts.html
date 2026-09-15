@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The integration, with pictures</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+  .subtitle { color: var(--muted); font-size: 0.98rem; margin: 0 0 1.8rem; }
+  h2 { margin-top: 2.6rem; }
+  figure { margin: 1.1rem 0 0.7rem; page-break-inside: avoid; }
+  figure svg { width: 100%; height: auto; display: block; }
+
+  .dg .box { fill: none; stroke: var(--rule); stroke-width: 2; }
+  .dg .box.fill { fill: var(--code-bg); }
+  .dg .box.ok { stroke: var(--text); stroke-width: 2.5; }
+  .dg .box.bad { stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 6 4; }
+  .dg .box.rule { fill: var(--setup-bg); stroke: var(--setup-border); }
+  .dg .pipe { fill: var(--code-bg); stroke: var(--rule); stroke-width: 2; }
+  .dg .arrow { fill: none; stroke: var(--faint); stroke-width: 2; marker-end: url(#ah); }
+  .dg .arrow.dash { stroke-dasharray: 5 4; }
+  .dg .miss .box { stroke: var(--accent); stroke-dasharray: 5 4; }
+  .dg .flow circle { fill: var(--faint); }
+  .dg .bricks rect { fill: var(--code-bg); stroke: var(--rule); stroke-width: 2; }
+  .dg .bricks.accentb rect { fill: var(--setup-bg); stroke: var(--accent); }
+  .dg .sep { stroke: var(--rule); stroke-width: 2; stroke-dasharray: 5 5; }
+  .dg .check circle { fill: none; stroke: var(--text); stroke-width: 2; }
+
+  .dg .t { font-family: system-ui, -apple-system, sans-serif; fill: var(--heading);
+           text-anchor: middle; font-size: 15px; }
+  .dg .t.sm { font-size: 13px; fill: var(--muted); }
+  .dg .t.xs { font-size: 12px; fill: var(--faint); }
+  .dg .t.tiny { font-size: 11px; fill: var(--muted); }
+  .dg .t.bold { font-weight: 650; fill: var(--heading); }
+  .dg .t.big { font-size: 30px; font-weight: 650; }
+  .dg .t.mono { font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 13px; }
+  .dg .t.left { text-anchor: start; }
+  .dg .t.strong { font-weight: 700; fill: var(--accent); }
+  .dg .t.hard { fill: var(--accent); font-weight: 650; }
+  .dg .t.x { fill: var(--accent); font-weight: 700; }
+
+  /* added for this document */
+  .dg .box.scope { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 9 5; }
+  .dg .diamond { fill: var(--setup-bg); stroke: var(--rule); stroke-width: 2; }
+  .dg .track { fill: none; stroke: var(--rule); stroke-width: 2; stroke-dasharray: 7 4; }
+  .dg .slab { fill: var(--code-bg); stroke: var(--muted2); stroke-width: 2; }
+  .dg .wave line { stroke: var(--muted); stroke-width: 1.6; }
+  .dg .person { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; }
+  .dg .gate { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+  .dg .t.right { text-anchor: end; }
+  .dg .t.mono.xs { font-size: 11px; }
+  .dg .t.mono.tiny { font-size: 11px; }
+
+  .watch { font-family: system-ui, sans-serif; font-size: 0.82rem; color: var(--faint);
+           margin: 0.1rem 0 1.4rem; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+</svg>
+<h1>The integration, with pictures</h1>
+<p class="subtitle">Deepgram Flux TTS as the voice of a Home Assistant voice assistant. One picture per mechanism, no code required to follow it.</p>
+
+<h2>1. Where this integration sits</h2>
+
+<figure>
+<svg viewBox="0 0 800 330" role="img" aria-label="A person speaks to a voice satellite, speech to text produces a transcript, a conversation agent writes a reply, and only the TTS entity plus API client and the Deepgram endpoint are inside this project's scope box. Audio comes back and Home Assistant plays it on a media player.">
+  <g class="dg">
+    <g class="person">
+      <circle cx="40" cy="70" r="10"/>
+      <path d="M40 80 V 102"/>
+      <path d="M28 88 H 52"/>
+      <path d="M40 102 L 31 118"/>
+      <path d="M40 102 L 49 118"/>
+    </g>
+    <text class="t xs" x="40" y="136">you</text>
+
+    <path class="arrow" d="M58 88 H 118"/>
+    <text class="t xs" x="88" y="78">speech</text>
+
+    <rect class="box" x="124" y="56" width="190" height="64" rx="10"/>
+    <text class="t bold" x="219" y="82">Voice satellite</text>
+    <text class="t sm" x="219" y="104">wake word and mic</text>
+
+    <path class="arrow" d="M314 88 H 374"/>
+    <text class="t xs" x="344" y="78">audio</text>
+
+    <rect class="box" x="380" y="56" width="190" height="64" rx="10"/>
+    <text class="t bold" x="475" y="82">Speech to text</text>
+    <text class="t sm" x="475" y="104">not ours either</text>
+
+    <path class="arrow" d="M570 88 H 630"/>
+    <text class="t xs" x="600" y="78">transcript</text>
+
+    <rect class="box" x="636" y="56" width="150" height="64" rx="10"/>
+    <text class="t bold" x="711" y="80">Conversation</text>
+    <text class="t bold" x="711" y="98">agent</text>
+    <text class="t xs" x="711" y="114">the LLM</text>
+
+    <path class="arrow" d="M711 124 V 150 H 129 V 186"/>
+    <text class="t sm" x="420" y="142">reply text, token by token</text>
+
+    <rect class="box scope" x="14" y="176" width="230" height="90" rx="12"/>
+    <text class="t sm hard" x="129" y="168">the only part this project owns</text>
+    <rect class="box ok" x="24" y="190" width="210" height="64" rx="10"/>
+    <text class="t bold" x="129" y="212">TTS entity</text>
+    <text class="t sm" x="129" y="230">plus the API client</text>
+    <text class="t mono xs" x="129" y="248">deepgram_tts</text>
+
+    <path class="arrow" d="M248 202 H 314"/>
+    <text class="t mono xs" x="281" y="192">Speak text</text>
+    <path class="arrow" d="M314 228 H 248"/>
+    <text class="t mono xs" x="281" y="246">linear16</text>
+
+    <rect class="box fill" x="320" y="190" width="200" height="64" rx="10"/>
+    <text class="t bold" x="420" y="212">Deepgram</text>
+    <text class="t mono" x="420" y="232">/v2/speak</text>
+    <text class="t xs" x="420" y="250">socket, or one POST</text>
+
+    <path class="arrow" d="M129 266 V 296 H 691 V 262"/>
+    <text class="t sm" x="410" y="290">WAV bytes, handed back to Home Assistant</text>
+
+    <rect class="box" x="596" y="190" width="190" height="64" rx="10"/>
+    <text class="t bold" x="691" y="214">Media player</text>
+    <text class="t sm" x="691" y="234">the speaker</text>
+    <text class="t sm" x="691" y="252">out loud, back to you</text>
+  </g>
+</svg>
+</figure>
+
+<p>Six things have to work for a voice assistant to answer out loud, and this project is one of them. It does not hear you, it does not transcribe you, and it does not decide what to say. It turns reply text into audio bytes and hands them back. Every bug in the old integration lived inside that one box.</p>
+
+<h2>2. Two endpoints, one client</h2>
+
+<figure>
+<svg viewBox="0 0 800 290" role="img" aria-label="A model id enters one client. A decision diamond tests whether the id starts with the flux prefix. Yes routes to POST /v2/speak, no routes to POST /v1/speak.">
+  <g class="dg">
+    <rect class="box" x="16" y="56" width="190" height="42" rx="8"/>
+    <text class="t mono" x="111" y="82">flux-haley-en</text>
+
+    <rect class="box" x="16" y="196" width="190" height="42" rx="8"/>
+    <text class="t mono" x="111" y="222">aura-2-thalia-en</text>
+
+    <path class="arrow" d="M206 77 H 226 V 140 H 242"/>
+    <path class="arrow" d="M206 217 H 226 V 140 H 242"/>
+
+    <polygon class="diamond" points="330,86 416,140 330,194 244,140"/>
+    <text class="t mono" x="330" y="134">model.startswith</text>
+    <text class="t mono" x="330" y="152">("flux-")</text>
+
+    <path class="arrow" d="M416 140 H 446 V 88 H 476"/>
+    <text class="t xs bold" x="430" y="130">yes</text>
+
+    <rect class="box ok" x="476" y="60" width="308" height="56" rx="8"/>
+    <text class="t mono bold" x="630" y="84">POST /v2/speak</text>
+    <text class="t sm" x="630" y="104">the only door Flux answers</text>
+
+    <path class="arrow" d="M330 194 V 232 H 476"/>
+    <text class="t xs bold" x="344" y="212">no</text>
+
+    <rect class="box ok" x="476" y="204" width="308" height="56" rx="8"/>
+    <text class="t mono bold" x="630" y="228">POST /v1/speak</text>
+    <text class="t sm" x="630" y="248">everything Aura, all 102 of them</text>
+  </g>
+</svg>
+</figure>
+
+<p>The prefix is the entire routing rule. One synthesize method, two URLs, no configuration and no lookup table.</p>
+
+<figure>
+<svg viewBox="0 0 800 150" role="img" aria-label="An Aura model id posted to /v2/speak returns HTTP 400 with error code V1_MODEL_ON_V2_SPEAK_ENDPOINT, and that check runs before the auth check.">
+  <g class="dg">
+    <rect class="box" x="16" y="48" width="190" height="44" rx="8"/>
+    <text class="t mono" x="111" y="75">aura-2-thalia-en</text>
+
+    <path class="arrow" d="M206 70 H 300"/>
+    <text class="t xs" x="253" y="58">posted to /v2</text>
+
+    <g class="miss">
+      <rect class="box" x="310" y="30" width="290" height="80" rx="8"/>
+      <text class="t bold" x="455" y="54">HTTP 400</text>
+      <text class="t mono xs" x="455" y="76">V1_MODEL_ON_V2_SPEAK_ENDPOINT</text>
+      <text class="t x xs" x="455" y="98">&#10007; rejected, no audio</text>
+    </g>
+
+    <path class="arrow" d="M600 70 H 640"/>
+
+    <rect class="box rule" x="650" y="30" width="134" height="80" rx="8"/>
+    <text class="t sm" x="717" y="56">checked</text>
+    <text class="t sm" x="717" y="74">before auth</text>
+    <text class="t xs" x="717" y="96">a dummy key too</text>
+  </g>
+</svg>
+</figure>
+
+<p>Parameter validation runs before the auth check, which is why every endpoint fact in the handoff was enumerated without a working API key. It also means a routing mistake fails loudly and cheaply rather than silently returning the wrong voice.</p>
+
+<h2>3. Two catalogs, one voice list</h2>
+
+<figure>
+<svg viewBox="0 0 800 330" role="img" aria-label="GET /v2/models returns 36 Flux voices, all English. GET /v1/models returns 102 Aura entries across 22 language codes and zero Flux entries. Both are merged into one catalog keyed by canonical name and tagged by family.">
+  <g class="dg">
+    <rect class="box fill" x="16" y="52" width="350" height="110" rx="10"/>
+    <text class="t mono bold" x="191" y="78">GET /v2/models</text>
+    <text class="t big" x="191" y="118">36</text>
+    <text class="t sm" x="191" y="140">voices, every one architecture flux-tts</text>
+    <text class="t xs" x="191" y="158">en, en-AU, en-GB, en-IE, en-IN, en-PH, en-SG, en-US</text>
+
+    <rect class="box rule" x="16" y="172" width="350" height="34" rx="8"/>
+    <text class="t sm bold" x="191" y="194">the only place Flux appears</text>
+
+    <rect class="box" x="434" y="52" width="350" height="110" rx="10"/>
+    <text class="t mono bold" x="609" y="78">GET /v1/models</text>
+    <text class="t big" x="609" y="118">102</text>
+    <text class="t sm" x="609" y="140">90 aura-2 plus 12 legacy aura</text>
+    <text class="t xs" x="609" y="158">22 codes: de, en, es, fr, it, ja, nl and regions</text>
+
+    <g class="miss">
+      <rect class="box" x="434" y="172" width="350" height="34" rx="8"/>
+      <text class="t sm strong" x="609" y="194">&#10007; zero Flux entries</text>
+    </g>
+
+    <path class="arrow" d="M191 206 V 244"/>
+    <text class="t xs" x="207" y="228">36</text>
+    <path class="arrow" d="M609 206 V 244"/>
+    <text class="t xs" x="625" y="228">102</text>
+
+    <rect class="box ok" x="130" y="250" width="540" height="64" rx="10"/>
+    <text class="t bold" x="400" y="276">one list of 138, keyed by canonical_name</text>
+    <text class="t sm" x="400" y="298">each entry tagged flux or aura, so the picker can group them</text>
+  </g>
+</svg>
+</figure>
+
+<p>Two fetches, no auth on either, merged once at setup. The family tag is what lets a single voice picker show both without the user needing to know there are two APIs underneath.</p>
+
+<figure>
+<svg viewBox="0 0 800 160" role="img" aria-label="The old integration discovered voices from /v1/models only, searched it for flux model ids, and found nothing, so Flux was invisible to it.">
+  <g class="dg">
+    <rect class="box" x="16" y="46" width="200" height="64" rx="8"/>
+    <text class="t bold" x="116" y="72">old integration</text>
+    <text class="t sm" x="116" y="92">dynamic discovery</text>
+
+    <path class="arrow" d="M216 78 H 320"/>
+    <text class="t mono xs" x="268" y="66">GET /v1/models</text>
+
+    <rect class="box fill" x="320" y="46" width="200" height="64" rx="8"/>
+    <text class="t mono" x="420" y="72">/v1/models</text>
+    <text class="t sm" x="420" y="92">102 entries</text>
+
+    <path class="arrow" d="M520 78 H 594"/>
+    <text class="t xs" x="557" y="66">look for flux</text>
+
+    <g class="miss">
+      <rect class="box" x="594" y="46" width="190" height="64" rx="8"/>
+      <text class="t strong" x="689" y="72">0 results</text>
+      <text class="t x xs" x="689" y="94">&#10007; Flux invisible</text>
+    </g>
+
+    <text class="t xs left" x="16" y="142">One endpoint, one blind spot. Flux was never missing from the old integration. It was never asked for.</text>
+  </g>
+</svg>
+</figure>
+
+<h2>4. Why a Spanish pipeline can never get a Flux voice</h2>
+
+<figure>
+<svg viewBox="0 0 800 300" role="img" aria-label="A table of Flux voice ids each showing base language en, next to two outcomes: an English request resolves to flux-haley-en, a Spanish request resolves to an Aura-2 Spanish voice because no Flux voice speaks Spanish.">
+  <g class="dg">
+    <rect class="box" x="16" y="52" width="380" height="200" rx="10"/>
+    <text class="t bold" x="206" y="78">the Flux shelf, all 36 of it</text>
+    <text class="t xs left" x="36" y="98">voice id</text>
+    <text class="t xs" x="302" y="98">base language</text>
+
+    <g class="bricks">
+      <rect x="32" y="106" width="200" height="17" rx="4"/>
+      <rect x="252" y="106" width="100" height="17" rx="4"/>
+      <rect x="32" y="126" width="200" height="17" rx="4"/>
+      <rect x="252" y="126" width="100" height="17" rx="4"/>
+      <rect x="32" y="146" width="200" height="17" rx="4"/>
+      <rect x="252" y="146" width="100" height="17" rx="4"/>
+      <rect x="32" y="166" width="200" height="17" rx="4"/>
+      <rect x="252" y="166" width="100" height="17" rx="4"/>
+      <rect x="32" y="186" width="200" height="17" rx="4"/>
+      <rect x="252" y="186" width="100" height="17" rx="4"/>
+      <rect x="32" y="206" width="200" height="17" rx="4"/>
+      <rect x="252" y="206" width="100" height="17" rx="4"/>
+      <rect x="32" y="226" width="200" height="17" rx="4"/>
+      <rect x="252" y="226" width="100" height="17" rx="4"/>
+    </g>
+    <text class="t mono tiny" x="132" y="119">flux-haley-en</text>
+    <text class="t mono tiny" x="302" y="119">en</text>
+    <text class="t mono tiny" x="132" y="139">flux-alexis-en</text>
+    <text class="t mono tiny" x="302" y="139">en</text>
+    <text class="t mono tiny" x="132" y="159">flux-marcus-en</text>
+    <text class="t mono tiny" x="302" y="159">en</text>
+    <text class="t mono tiny" x="132" y="179">flux-priya-en</text>
+    <text class="t mono tiny" x="302" y="179">en</text>
+    <text class="t mono tiny" x="132" y="199">flux-naveen-en</text>
+    <text class="t mono tiny" x="302" y="199">en</text>
+    <text class="t mono tiny" x="132" y="219">flux-sienna-en</text>
+    <text class="t mono tiny" x="302" y="219">en</text>
+    <text class="t tiny" x="132" y="239">and 30 more</text>
+    <text class="t mono tiny" x="302" y="239">en</text>
+
+    <rect class="box ok" x="440" y="52" width="344" height="88" rx="10"/>
+    <text class="t bold" x="612" y="78">ask in English</text>
+    <text class="t mono bold" x="612" y="104">flux-haley-en</text>
+    <text class="t sm" x="612" y="126">Flux, and the shipped default</text>
+
+    <g class="miss">
+      <rect class="box" x="440" y="164" width="344" height="88" rx="10"/>
+      <text class="t bold" x="612" y="190">ask in Spanish</text>
+      <text class="t mono bold" x="612" y="216">aura-2-celeste-es</text>
+      <text class="t sm hard" x="612" y="238">Aura-2, because nothing else exists</text>
+    </g>
+
+    <text class="t xs left" x="16" y="282">Not a gap that closes later. There is no Spanish Flux voice to resolve to, so Aura-2 is the exit, not a nicety.</text>
+  </g>
+</svg>
+</figure>
+
+<p class="watch">Moving version, showing both branches of the resolver: <a href="assets/voice-resolution.svg">assets/voice-resolution.svg</a></p>
+
+<h2>5. The hyphen</h2>
+
+<figure>
+<svg viewBox="0 0 800 300" role="img" aria-label="Splitting en-US on an underscore returns en-US unchanged, so the language list mixes base and regional codes. Splitting on a hyphen returns en, so the list holds base codes only.">
+  <g class="dg">
+    <g class="miss">
+      <rect class="box" x="16" y="52" width="370" height="204" rx="10"/>
+    </g>
+    <text class="t bold" x="201" y="78">before: split on an underscore</text>
+    <rect class="box fill" x="46" y="92" width="310" height="32" rx="6"/>
+    <text class="t mono" x="201" y="114">"en-US".split("_")[0]</text>
+    <path class="arrow" d="M201 126 V 148"/>
+    <g class="miss">
+      <rect class="box" x="116" y="148" width="170" height="30" rx="6"/>
+    </g>
+    <text class="t mono strong" x="201" y="168">"en-US"</text>
+    <text class="t x xs left" x="296" y="168">&#10007; no-op</text>
+    <path class="arrow" d="M201 180 V 200"/>
+    <rect class="box" x="56" y="200" width="290" height="46" rx="6"/>
+    <text class="t sm" x="201" y="220">the dropdown a person sees</text>
+    <text class="t mono xs" x="201" y="238">en, en-AU, en-GB, en-US, es, es-419, ...</text>
+
+    <rect class="box ok" x="414" y="52" width="370" height="204" rx="10"/>
+    <text class="t bold" x="599" y="78">after: split on a hyphen</text>
+    <rect class="box fill" x="444" y="92" width="310" height="32" rx="6"/>
+    <text class="t mono" x="599" y="114">"en-US".split("-")[0]</text>
+    <path class="arrow" d="M599 126 V 148"/>
+    <rect class="box ok" x="514" y="148" width="170" height="30" rx="6"/>
+    <text class="t mono bold" x="599" y="168">"en"</text>
+    <text class="t xs left" x="694" y="168">&#10003; base code</text>
+    <path class="arrow" d="M599 180 V 200"/>
+    <rect class="box" x="454" y="200" width="290" height="46" rx="6"/>
+    <text class="t sm" x="599" y="220">the dropdown a person sees</text>
+    <text class="t mono xs" x="599" y="238">de, en, es, fr, it, ja, nl</text>
+
+    <text class="t xs left" x="16" y="276">Deepgram uses hyphens. One wrong character, wrong in five places,</text>
+    <text class="t xs left" x="16" y="292">and the symptom a person sees is a language list with duplicates in it.</text>
+  </g>
+</svg>
+</figure>
+
+<p>Splitting <code>"en-US"</code> on an underscore finds no underscore, so it hands back the whole string. Nothing raises. The only way you find out is by opening the dropdown and seeing <code>en</code> and <code>en-US</code> sitting next to each other as if they were different languages.</p>
+
+<h2>6. Batch and streaming, on the same clock</h2>
+
+<figure>
+<svg viewBox="0 0 800 330" role="img" aria-label="A shared time axis from zero to two seconds. The batch lane is silent until 1.6 seconds then plays one clip. The streaming lane sends four Speak messages and a Flush, and audio frames run continuously from 0.25 seconds, between SpeechStarted and SpeechMetadata.">
+  <g class="dg">
+    <path class="gate" d="M252 56 V 280"/>
+    <path class="gate" d="M644 56 V 280"/>
+
+    <text class="t bold left" x="16" y="82">Batch</text>
+    <text class="t mono xs left" x="16" y="102">POST /v2/speak</text>
+    <rect class="track" x="180" y="70" width="464" height="28" rx="5"/>
+    <text class="t sm" x="412" y="89">silence, waiting for the whole clip</text>
+    <rect class="slab" x="644" y="70" width="116" height="28" rx="5"/>
+    <text class="t xs" x="702" y="89">one clip</text>
+    <path class="arrow" d="M760 84 H 782"/>
+
+    <text class="t bold left" x="16" y="182">Streaming</text>
+    <text class="t mono xs left" x="16" y="202">wss /v2/speak</text>
+    <g class="bricks">
+      <rect x="195" y="134" width="60" height="22" rx="5"/>
+      <rect x="265" y="134" width="60" height="22" rx="5"/>
+      <rect x="345" y="134" width="60" height="22" rx="5"/>
+      <rect x="425" y="134" width="60" height="22" rx="5"/>
+    </g>
+    <text class="t mono tiny" x="225" y="149">Speak</text>
+    <text class="t mono tiny" x="295" y="149">Speak</text>
+    <text class="t mono tiny" x="375" y="149">Speak</text>
+    <text class="t mono tiny" x="455" y="149">Speak</text>
+    <g class="miss">
+      <rect class="box" x="505" y="134" width="60" height="22" rx="5"/>
+    </g>
+    <text class="t mono tiny" x="535" y="149">Flush</text>
+    <text class="t xs left" x="580" y="149">text going out, as it arrives</text>
+
+    <rect class="slab" x="252" y="170" width="508" height="28" rx="5"/>
+    <g class="wave">
+      <line x1="266" y1="177" x2="266" y2="191"/><line x1="282" y1="173" x2="282" y2="195"/>
+      <line x1="298" y1="178" x2="298" y2="190"/><line x1="314" y1="172" x2="314" y2="196"/>
+      <line x1="330" y1="177" x2="330" y2="191"/><line x1="346" y1="174" x2="346" y2="194"/>
+      <line x1="362" y1="178" x2="362" y2="190"/><line x1="378" y1="172" x2="378" y2="196"/>
+      <line x1="394" y1="177" x2="394" y2="191"/><line x1="410" y1="174" x2="410" y2="194"/>
+      <line x1="426" y1="178" x2="426" y2="190"/><line x1="442" y1="172" x2="442" y2="196"/>
+      <line x1="458" y1="177" x2="458" y2="191"/><line x1="474" y1="174" x2="474" y2="194"/>
+      <line x1="490" y1="178" x2="490" y2="190"/><line x1="506" y1="172" x2="506" y2="196"/>
+      <line x1="522" y1="177" x2="522" y2="191"/><line x1="538" y1="174" x2="538" y2="194"/>
+      <line x1="554" y1="178" x2="554" y2="190"/><line x1="570" y1="172" x2="570" y2="196"/>
+      <line x1="586" y1="177" x2="586" y2="191"/><line x1="602" y1="174" x2="602" y2="194"/>
+      <line x1="618" y1="178" x2="618" y2="190"/><line x1="634" y1="172" x2="634" y2="196"/>
+      <line x1="650" y1="177" x2="650" y2="191"/><line x1="666" y1="174" x2="666" y2="194"/>
+      <line x1="682" y1="178" x2="682" y2="190"/><line x1="698" y1="172" x2="698" y2="196"/>
+      <line x1="714" y1="177" x2="714" y2="191"/><line x1="730" y1="174" x2="730" y2="194"/>
+      <line x1="746" y1="178" x2="746" y2="190"/>
+    </g>
+    <path class="arrow" d="M760 184 H 782"/>
+
+    <text class="t mono xs" x="238" y="216">SpeechStarted</text>
+    <text class="t mono xs" x="600" y="216">SpeechMetadata</text>
+    <text class="t xs hard" x="252" y="240">first sound, 0.25 s</text>
+    <text class="t xs hard" x="644" y="262">first sound, 1.6 s</text>
+
+    <path d="M180 280 H 782" fill="none" stroke="currentColor" stroke-width="2"/>
+    <g stroke="currentColor" stroke-width="2">
+      <path d="M180 280 V 288"/><path d="M325 280 V 288"/><path d="M470 280 V 288"/>
+      <path d="M615 280 V 288"/><path d="M760 280 V 288"/>
+    </g>
+    <text class="t xs" x="180" y="304">0 s</text>
+    <text class="t xs" x="325" y="304">0.5</text>
+    <text class="t xs" x="470" y="304">1.0</text>
+    <text class="t xs" x="615" y="304">1.5</text>
+    <text class="t xs" x="760" y="304">2.0</text>
+    <text class="t xs left" x="16" y="304">time</text>
+  </g>
+</svg>
+</figure>
+
+<p class="watch">Moving version, with a playhead sweeping the axis: <a href="assets/streaming-vs-batch.svg">assets/streaming-vs-batch.svg</a></p>
+
+<p>Same reply, same voice, same audio in the end. The difference is not architecture, it is 1.35 seconds of silence in a room where someone just asked a question. Every audio frame for a turn arrives between <code>SpeechStarted</code> and <code>SpeechMetadata</code>, and the first one lands before the sentence is finished.</p>
+
+<h2>7. The server places the flush boundaries</h2>
+
+<figure>
+<svg viewBox="0 0 800 430" role="img" aria-label="The wrong way splits the reply on sentence punctuation, makes four separate POSTs each with a wait, then decodes, re-encodes and glues the clips, producing seams. The right way streams tokens into one socket and lets the server place the boundaries, returning one continuous audio stream.">
+  <g class="dg">
+    <text class="t bold left hard" x="16" y="30">the wrong way, and 206 lines of it</text>
+
+    <rect class="box" x="16" y="110" width="146" height="44" rx="8"/>
+    <text class="t sm" x="89" y="130">one reply</text>
+    <text class="t xs" x="89" y="147">from the LLM</text>
+
+    <path class="arrow" d="M162 132 H 200"/>
+
+    <g class="miss">
+      <rect class="box" x="200" y="110" width="146" height="44" rx="8"/>
+    </g>
+    <text class="t sm" x="273" y="130">split on "."</text>
+    <text class="t xs" x="273" y="147">our own regex</text>
+
+    <path class="arrow" d="M346 132 H 384"/>
+
+    <text class="t xs" x="450" y="38">one round trip per sentence</text>
+    <g class="bricks">
+      <rect x="384" y="48" width="132" height="36" rx="6"/>
+      <rect x="384" y="92" width="132" height="36" rx="6"/>
+      <rect x="384" y="136" width="132" height="36" rx="6"/>
+      <rect x="384" y="180" width="132" height="36" rx="6"/>
+    </g>
+    <text class="t xs" x="450" y="71">POST, then wait</text>
+    <text class="t xs" x="450" y="115">POST, then wait</text>
+    <text class="t xs" x="450" y="159">POST, then wait</text>
+    <text class="t xs" x="450" y="203">POST, then wait</text>
+
+    <path class="arrow" d="M516 132 H 556"/>
+
+    <g class="miss">
+      <rect class="box" x="556" y="102" width="132" height="60" rx="8"/>
+    </g>
+    <text class="t sm" x="622" y="122">decode</text>
+    <text class="t sm" x="622" y="140">re-encode</text>
+    <text class="t sm" x="622" y="158">glue</text>
+
+    <path class="arrow" d="M688 132 H 718"/>
+
+    <g class="miss">
+      <rect class="box" x="718" y="102" width="66" height="60" rx="8"/>
+    </g>
+    <text class="t x" x="751" y="130">&#10007;</text>
+    <text class="t xs" x="751" y="150">seams</text>
+
+    <text class="t xs left" x="16" y="236">Four round trips, four seams, and a full audio transcode per sentence on a Raspberry Pi, for nothing.</text>
+
+    <path class="sep" d="M16 256 H 784"/>
+
+    <text class="t bold left" x="16" y="296">the right way</text>
+
+    <rect class="box" x="16" y="330" width="130" height="52" rx="8"/>
+    <text class="t sm" x="81" y="352">tokens</text>
+    <text class="t xs" x="81" y="370">as they arrive</text>
+
+    <path class="arrow" d="M146 356 H 196"/>
+    <text class="t mono xs" x="171" y="346">Speak</text>
+
+    <rect class="pipe" x="200" y="316" width="400" height="84" rx="42"/>
+    <text class="t bold" x="400" y="344">one socket, /v2/speak</text>
+    <g class="flow">
+      <circle cx="248" cy="362" r="5"/>
+      <circle cx="292" cy="362" r="5"/>
+      <circle cx="336" cy="362" r="5"/>
+      <circle cx="464" cy="362" r="5"/>
+      <circle cx="508" cy="362" r="5"/>
+      <circle cx="552" cy="362" r="5"/>
+    </g>
+    <path class="gate" d="M380 330 V 392"/>
+    <path class="gate" d="M400 330 V 392"/>
+    <path class="gate" d="M420 330 V 392"/>
+    <text class="t sm hard" x="400" y="386">boundaries, placed here</text>
+
+    <path class="arrow" d="M600 356 H 640"/>
+    <text class="t mono xs" x="620" y="346">frames</text>
+
+    <rect class="box ok" x="646" y="330" width="138" height="52" rx="8"/>
+    <text class="t bold" x="715" y="352">audio</text>
+    <text class="t sm" x="715" y="372">no seams</text>
+
+    <text class="t xs left" x="16" y="422">Nothing on our side decides where a sentence ends, so there is no sentence splitter to write and no fragments to stitch.</text>
+  </g>
+</svg>
+</figure>
+
+<p class="watch">Moving version, tokens in and frames out: <a href="assets/flush-boundaries.svg">assets/flush-boundaries.svg</a></p>
+
+<p>This is the single most important fact in the handoff, and it is a deletion rather than a feature. A regex over the reply text means this paragraph was not read.</p>
+
+<h2>8. The trap: there is no streaming flag</h2>
+
+<figure>
+<svg viewBox="0 0 800 400" role="img" aria-label="Home Assistant compares the entity class's async_stream_tts_audio against the base method. Because it differs, async_supports_streaming_input returns True with no flag involved. A direct tts.speak call still uses async_get_tts_audio and works, while every Assist pipeline reply routes to the half built streaming path and fails.">
+  <g class="dg">
+    <rect class="box" x="16" y="52" width="250" height="88" rx="10"/>
+    <text class="t mono bold" x="141" y="78">DeepgramTTSEntity</text>
+    <text class="t mono xs" x="141" y="102">async_stream_tts_audio</text>
+    <text class="t xs" x="141" y="124">defined, even half built</text>
+
+    <path class="arrow" d="M266 96 H 318"/>
+    <text class="t xs" x="292" y="86">compare</text>
+
+    <rect class="box rule" x="318" y="44" width="300" height="104" rx="10"/>
+    <text class="t mono" x="468" y="70">async_supports_streaming_input()</text>
+    <text class="t xs" x="468" y="94">base method against this class's method</text>
+    <text class="t xs" x="468" y="114">different? then streaming is on</text>
+    <text class="t sm strong" x="468" y="138">there is no flag to set</text>
+
+    <path class="arrow" d="M618 96 H 664"/>
+
+    <rect class="box ok" x="664" y="66" width="120" height="60" rx="10"/>
+    <text class="t bold" x="724" y="94">True</text>
+    <text class="t xs" x="724" y="114">auto-detected</text>
+
+    <path class="sep" d="M16 172 H 784"/>
+
+    <rect class="box" x="16" y="200" width="200" height="56" rx="8"/>
+    <text class="t mono bold" x="116" y="224">tts.speak</text>
+    <text class="t sm" x="116" y="244">a script, a button</text>
+
+    <path class="arrow" d="M216 228 H 300"/>
+    <text class="t xs" x="258" y="218">always batch</text>
+
+    <rect class="box" x="300" y="200" width="250" height="56" rx="8"/>
+    <text class="t mono" x="425" y="224">async_get_tts_audio</text>
+    <text class="t sm" x="425" y="244">the finished path</text>
+
+    <path class="arrow" d="M550 228 H 620"/>
+    <text class="t xs" x="585" y="218">audio</text>
+
+    <rect class="box ok" x="620" y="200" width="164" height="56" rx="8"/>
+    <text class="t bold" x="702" y="234">it works</text>
+
+    <rect class="box" x="16" y="300" width="200" height="56" rx="8"/>
+    <text class="t bold" x="116" y="324">Assist pipeline</text>
+    <text class="t sm" x="116" y="344">every spoken reply</text>
+
+    <path class="arrow" d="M216 328 H 300"/>
+    <text class="t xs" x="258" y="318">silently</text>
+
+    <g class="miss">
+      <rect class="box" x="300" y="300" width="250" height="56" rx="8"/>
+    </g>
+    <text class="t mono" x="425" y="324">async_stream_tts_audio</text>
+    <text class="t sm hard" x="425" y="344">the half built path</text>
+
+    <path class="arrow" d="M550 328 H 620"/>
+
+    <g class="miss">
+      <rect class="box" x="620" y="300" width="164" height="56" rx="8"/>
+    </g>
+    <text class="t x" x="702" y="326">&#10007;</text>
+    <text class="t xs" x="702" y="346">every reply fails</text>
+
+    <text class="t xs left" x="16" y="388">Nobody opted in to streaming. Defining the method is the opt-in, and it goes live the moment it exists.</text>
+  </g>
+</svg>
+</figure>
+
+<p>This is the diagram to remember if you are writing any Home Assistant TTS entity. The bottom row is the one people actually use and the top row is the one they test, so a broken socket path looks like a working integration right up until someone talks to it.</p>
+
+<h2>9. Two entries, side by side</h2>
+
+<figure>
+<svg viewBox="0 0 800 344" role="img" aria-label="Two config entries coexist: a Flux entity for English with unique_id flux-haley-en, and an Aura entity for Spanish with unique_id aura-2-celeste-es. A constant unique_id would make the second entry abort with already_configured.">
+  <g class="dg">
+    <rect class="box ok" x="16" y="52" width="370" height="140" rx="10"/>
+    <text class="t bold" x="201" y="78">entry one</text>
+    <text class="t mono sm" x="201" y="102">Deepgram Flux (Haley)</text>
+    <text class="t xs left" x="46" y="128">unique_id</text>
+    <text class="t mono xs right" x="356" y="128">flux-haley-en</text>
+    <text class="t xs left" x="46" y="152">language</text>
+    <text class="t mono xs right" x="356" y="152">en</text>
+    <text class="t xs left" x="46" y="176">family</text>
+    <text class="t xs right" x="356" y="176">Flux, speed allowed</text>
+
+    <rect class="box ok" x="414" y="52" width="370" height="140" rx="10"/>
+    <text class="t bold" x="599" y="78">entry two</text>
+    <text class="t mono sm" x="599" y="102">Deepgram Aura (Celeste)</text>
+    <text class="t xs left" x="444" y="128">unique_id</text>
+    <text class="t mono xs right" x="754" y="128">aura-2-celeste-es</text>
+    <text class="t xs left" x="444" y="152">language</text>
+    <text class="t mono xs right" x="754" y="152">es</text>
+    <text class="t xs left" x="444" y="176">family</text>
+    <text class="t xs right" x="754" y="176">Aura-2, no speed</text>
+
+    <path class="sep" d="M16 214 H 784"/>
+
+    <g class="miss">
+      <rect class="box" x="16" y="236" width="370" height="80" rx="10"/>
+    </g>
+    <text class="t mono sm" x="201" y="264">async_set_unique_id("deepgram_tts")</text>
+    <text class="t xs" x="201" y="288">a constant, identical for every entry</text>
+
+    <path class="arrow" d="M386 276 H 460"/>
+    <text class="t xs" x="423" y="266">add a second</text>
+
+    <g class="miss">
+      <rect class="box" x="460" y="236" width="324" height="80" rx="10"/>
+    </g>
+    <text class="t strong" x="622" y="266">abort: already_configured</text>
+    <text class="t xs" x="622" y="290">one voice, one language, forever</text>
+
+    <text class="t xs left" x="16" y="336">The unique_id is the voice, so the same voice cannot be added twice and a different voice always can.</text>
+  </g>
+</svg>
+</figure>
+
+<p>Two entries is not a nice-to-have here. Because every Flux voice is English, an English and a Spanish household needs two entities, which means <code>single_config_entry</code> stays out of the manifest and no constant <code>unique_id</code> stands in for it.</p>
+
+<h2>10. The order it gets built in</h2>
+
+<figure>
+<svg viewBox="0 0 800 210" role="img" aria-label="Seven chapters in build order: scaffold, api client, catalog, config flow, batch tts, streaming, harden. Chapter one has landed. A gate between chapters five and six marks the point where the batch path must run on real hardware first.">
+  <g class="dg">
+    <g class="bricks">
+      <rect x="16" y="60" width="100" height="44" rx="6"/>
+      <rect x="126" y="60" width="100" height="44" rx="6"/>
+      <rect x="236" y="60" width="100" height="44" rx="6"/>
+      <rect x="346" y="60" width="100" height="44" rx="6"/>
+      <rect x="456" y="60" width="100" height="44" rx="6"/>
+    </g>
+    <g class="bricks accentb">
+      <rect x="566" y="60" width="100" height="44" rx="6"/>
+    </g>
+    <g class="bricks">
+      <rect x="676" y="60" width="100" height="44" rx="6"/>
+    </g>
+
+    <text class="t bold" x="66" y="89">1</text>
+    <text class="t bold" x="176" y="89">2</text>
+    <text class="t bold" x="286" y="89">3</text>
+    <text class="t bold" x="396" y="89">4</text>
+    <text class="t bold" x="506" y="89">5</text>
+    <text class="t bold hard" x="616" y="89">6</text>
+    <text class="t bold" x="726" y="89">7</text>
+
+    <text class="t tiny" x="66" y="120">scaffold</text>
+    <text class="t tiny" x="176" y="120">api client</text>
+    <text class="t tiny" x="286" y="120">catalog</text>
+    <text class="t tiny" x="396" y="120">config flow</text>
+    <text class="t tiny" x="506" y="120">batch tts</text>
+    <text class="t tiny hard" x="616" y="120">streaming</text>
+    <text class="t tiny" x="726" y="120">harden</text>
+
+    <text class="t xs" x="66" y="48">&#10003; landed</text>
+
+    <path class="gate" d="M561 48 V 140"/>
+    <text class="t xs hard" x="561" y="158">real hardware gate</text>
+
+    <text class="t xs left" x="16" y="192">Chapter 6 is the only one with real design risk. Chapter 5 has to speak on the real instance before it starts.</text>
+  </g>
+</svg>
+</figure>
+
+<h2>The whole thing in one breath</h2>
+
+<blockquote>
+<p>A model id's prefix picks the endpoint, and nothing else does. Two public catalogs merge into one voice list, which is the only way Flux becomes visible at all. Every Flux voice is English, so Aura-2 is the only exit for a Spanish pipeline, and that is why two config entries have to be allowed. Tokens stream straight into one socket and the server decides where to breathe, which is a 206-line file that does not get written. And defining <code>async_stream_tts_audio</code> turns streaming on with no flag, so the half-built version of it is the version every Assist reply uses.</p>
+</blockquote>
+
+<p class="meta">Plain-language companion to <code>HANDOFF.md</code> and <code>docs/superpowers/interface-contract.md</code>. Written 2026-09-15 against 325d6d7, chapter 1. Animated versions of diagrams 4, 6 and 7 live in <code>docs/assets/</code>. Kept as a build artifact. The Aura Spanish voice id shown is illustrative; the catalog fetch in chapter 3 is what confirms it.</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>

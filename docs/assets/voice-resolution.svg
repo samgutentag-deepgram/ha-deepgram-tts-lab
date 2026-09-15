@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 300" width="660" height="300" role="img" aria-label="A flowchart for resolving a voice from a language code. Two inputs, en-US and es-MX, feed one decision diamond that asks whether the base language starts with en. The yes branch leads to flux-haley-en, labeled Flux, 36 voices, all English. The no branch leads to aura-2-celeste-es, labeled Aura-2, 102 voices, 22 codes. An amber dot travels the English path first, then the Spanish path, and the active input is outlined while its path runs.">
+  <!--
+    generate-animations timing plan. 7s loop, two phases.
+      0% to 42%   the en-US dot travels the yes branch to the Flux voice
+      42% to 50%  brief pause
+      50% to 92%  the es-MX dot travels the no branch to the Aura voice
+      92% to 100% brief pause, then the loop resets
+    Reads frozen: the whole flowchart, both yes and no labels, both outputs and both
+    check badges are static. Only the dot and the active input outline move.
+  -->
+  <style>
+    .dotEn { animation: dgEn 7s linear infinite; }
+    .dotEs { animation: dgEs 7s linear infinite; }
+    .actEn { animation: dgActEn 7s linear infinite; }
+    .actEs { animation: dgActEs 7s linear infinite; }
+    @keyframes dgEn {
+      0% { transform: translate(0, 0); opacity: 0; }
+      2% { opacity: 1; }
+      3.2% { transform: translate(30px, 0); }
+      9.1% { transform: translate(30px, 56px); }
+      12.2% { transform: translate(60px, 56px); }
+      20% { transform: translate(134px, 56px); }
+      27.8% { transform: translate(208px, 56px); }
+      32% { transform: translate(248px, 56px); }
+      37.8% { transform: translate(248px, 1px); }
+      42% { transform: translate(288px, 1px); opacity: 1; }
+      44%, 100% { transform: translate(288px, 1px); opacity: 0; }
+    }
+    @keyframes dgEs {
+      0%, 50% { transform: translate(0, 0); opacity: 0; }
+      52% { opacity: 1; }
+      52.9% { transform: translate(30px, 0); }
+      58.3% { transform: translate(30px, -56px); }
+      61.2% { transform: translate(60px, -56px); }
+      68.3% { transform: translate(134px, -56px); }
+      77.2% { transform: translate(134px, 36px); }
+      92% { transform: translate(288px, 36px); opacity: 1; }
+      94%, 100% { transform: translate(288px, 36px); opacity: 0; }
+    }
+    @keyframes dgActEn { 0%, 45% { opacity: 1; } 47%, 100% { opacity: 0; } }
+    @keyframes dgActEs { 0%, 49% { opacity: 0; } 51%, 95% { opacity: 1; } 97%, 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .dotEn, .dotEs, .actEn, .actEs { animation: none; }
+      .dotEn, .dotEs { opacity: 0; }
+      .actEn, .actEs { opacity: 1; }
+    }
+  </style>
+
+  <defs>
+    <marker id="vrArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9aa3b0"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="660" height="300" rx="10" fill="#ffffff"/>
+  <text x="16" y="26" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#3a4350">A language code in, one voice out</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+
+    <text x="16" y="56" font-size="9.5" fill="#5b6573">Assist pipeline asks in</text>
+
+    <rect x="16" y="70" width="100" height="30" rx="6" fill="#eef1f5" stroke="#9aa3b0" stroke-width="1.5"/>
+    <text x="66" y="90" text-anchor="middle" font-size="11" font-family="ui-monospace, monospace" fill="#3a4350">"en-US"</text>
+    <rect class="actEn" x="12" y="66" width="108" height="38" rx="8" fill="none" stroke="#e8932a" stroke-width="2" stroke-dasharray="4 3" opacity="1"/>
+
+    <rect x="16" y="182" width="100" height="30" rx="6" fill="#eef1f5" stroke="#9aa3b0" stroke-width="1.5"/>
+    <text x="66" y="202" text-anchor="middle" font-size="11" font-family="ui-monospace, monospace" fill="#3a4350">"es-MX"</text>
+    <rect class="actEs" x="12" y="178" width="108" height="38" rx="8" fill="none" stroke="#e8932a" stroke-width="2" stroke-dasharray="4 3" opacity="0"/>
+
+    <polyline points="116,85 146,85 146,141 176,141" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#vrArrow)"/>
+    <polyline points="116,197 146,197 146,141 176,141" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#vrArrow)"/>
+
+    <polygon points="250,89 324,141 250,193 176,141" fill="#f7f9fc" stroke="#9aa3b0" stroke-width="1.5"/>
+    <text x="250" y="136" text-anchor="middle" font-size="11.5" fill="#3a4350">base language</text>
+    <text x="250" y="152" text-anchor="middle" font-size="11.5" font-weight="700" fill="#3a4350">starts with en?</text>
+    <text x="170" y="214" text-anchor="end" font-size="9.5" fill="#5b6573">hyphen, not underscore</text>
+
+    <polyline points="324,141 364,141 364,86 404,86" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#vrArrow)"/>
+    <text x="344" y="132" text-anchor="middle" font-size="10" font-weight="700" fill="#3a4350">yes</text>
+
+    <polyline points="250,193 250,233 404,233" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#vrArrow)"/>
+    <text x="264" y="212" font-size="10" font-weight="700" fill="#3a4350">no</text>
+
+    <rect x="404" y="58" width="240" height="56" rx="8" fill="#e3edfc" stroke="#346DDB" stroke-width="1.5"/>
+    <text x="516" y="82" text-anchor="middle" font-size="11.5" font-weight="700" font-family="ui-monospace, monospace" fill="#1f5fc0">flux-haley-en</text>
+    <text x="516" y="100" text-anchor="middle" font-size="10" fill="#1f5fc0">Flux: 36 voices, all English</text>
+    <g>
+      <circle cx="634" cy="66" r="7" fill="#1d9b54" stroke="#ffffff" stroke-width="1.3"/>
+      <polyline points="630.8,66 633,68.4 637.2,63.4" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <rect x="404" y="205" width="240" height="56" rx="8" fill="#e2f4f1" stroke="#18a394" stroke-width="1.5"/>
+    <text x="516" y="229" text-anchor="middle" font-size="11.5" font-weight="700" font-family="ui-monospace, monospace" fill="#0e7d70">aura-2-celeste-es</text>
+    <text x="516" y="247" text-anchor="middle" font-size="10" fill="#0e7d70">Aura-2: 102 voices, 22 codes</text>
+    <g>
+      <circle cx="634" cy="213" r="7" fill="#1d9b54" stroke="#ffffff" stroke-width="1.3"/>
+      <polyline points="630.8,213 633,215.4 637.2,210.4" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <circle class="dotEn" cx="116" cy="85" r="4" fill="#e8932a" opacity="0"/>
+    <circle class="dotEs" cx="116" cy="197" r="4" fill="#e8932a" opacity="0"/>
+
+    <text x="16" y="284" font-size="11.5" fill="#5b6573">There is no Spanish Flux voice to fall back to, so Aura-2 is not a nicety. It is the only exit.</text>
+  </g>
+</svg>
