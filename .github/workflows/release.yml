@@ -1,0 +1,89 @@
+name: Release
+
+# Two triggers, because both orders happen in practice: pushing a tag from the
+# terminal, and clicking "publish release" in the GitHub UI. The tag is resolved
+# per event so the version check reads the same value either way.
+on:
+  push:
+    tags:
+      - "v*"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach to"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: verify version and attach zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Resolve the tag
+        id: tag
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            push)              tag="${GITHUB_REF_NAME}" ;;
+            release)           tag="${{ github.event.release.tag_name }}" ;;
+            workflow_dispatch) tag="${{ github.event.inputs.tag }}" ;;
+            *) echo "unexpected event ${{ github.event_name }}" >&2; exit 1 ;;
+          esac
+          echo "tag=${tag}" >>"$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >>"$GITHUB_OUTPUT"
+          echo "Tag ${tag}"
+
+      - name: Check manifest version matches the tag
+        run: |
+          set -euo pipefail
+          manifest=custom_components/deepgram_tts/manifest.json
+          in_manifest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$manifest")
+          expected='${{ steps.tag.outputs.version }}'
+          echo "manifest.json version: ${in_manifest}"
+          echo "tag version:           ${expected}"
+          if [ "$in_manifest" != "$expected" ]; then
+            {
+              echo "::error file=${manifest}::version mismatch"
+              echo "manifest.json says ${in_manifest} but the tag says ${expected}."
+              echo "HACS reads the version from manifest.json, not from the tag, so a"
+              echo "mismatch ships a build that reports the wrong version forever."
+              echo "Fix manifest.json, then retag."
+            } >&2
+            exit 1
+          fi
+          echo "Versions match."
+
+      - name: Build the zip
+        run: |
+          set -euo pipefail
+          # The archive holds the integration's files at its root, which is the
+          # layout HACS expects when zip_release is true: it extracts straight
+          # into config/custom_components/deepgram_tts/.
+          cd custom_components/deepgram_tts
+          zip -r "${GITHUB_WORKSPACE}/deepgram_tts.zip" . \
+            -x '*.pyc' -x '__pycache__/*'
+          cd "$GITHUB_WORKSPACE"
+          unzip -l deepgram_tts.zip
+
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # gh ships on ubuntu-latest, so this needs no third party action.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" deepgram_tts.zip --clobber
+          else
+            gh release create "$TAG" deepgram_tts.zip \
+              --title "$TAG" \
+              --generate-notes
+          fi

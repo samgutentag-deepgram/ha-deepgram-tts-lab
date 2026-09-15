@@ -19,3 +19,6 @@ scripts/out/
 
 # agent worktrees. real git worktrees, never content
 .claude/worktrees/
+
+# deploy target config for scripts/deploy.sh and scripts/tail_ha_log.sh (host, token)
+scripts/.ha-deploy.env

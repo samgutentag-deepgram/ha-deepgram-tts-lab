@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploying to a Real Home Assistant Instance</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+
+  /* ===== deploying.html specifics ===== */
+  .subtitle { color: var(--faint); font-family: system-ui, sans-serif; font-size: 0.9rem; margin: 0 0 1.6rem; }
+  ul.check { list-style: none; padding-left: 0; }
+  ul.check li { margin: 0.3rem 0; padding-left: 0.1rem; }
+  ul.check input[type="checkbox"] { margin-right: 0.55rem; transform: translateY(1px); }
+  td.no { color: var(--faint); }
+  ul.src { font-size: 0.88rem; }
+  ul.src li { margin: 0.25rem 0; color: var(--muted2); }
+  @media print {
+    ul.check input[type="checkbox"] { -webkit-appearance: none; appearance: none;
+      width: 0.85em; height: 0.85em; border: 1px solid #555; border-radius: 2px;
+      display: inline-block; vertical-align: middle; }
+  }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<h1>Getting this integration onto a real Home Assistant instance</h1>
+<p class="subtitle">Deepgram TTS for Home Assistant. Written 2026-09-15 against Home Assistant
+2026.9.x.</p>
+
+<p>HANDOFF section 6 puts a gate in front of chapter 6: the batch path has to be running on the
+real instance before any streaming work starts, because that is what makes the streaming work
+verifiable instead of theoretical. Nobody had written down how code in this repo reaches that
+instance. This page is that path, plus the checklist that closes the gate.</p>
+
+<p>Two scripts do the work. <code>scripts/deploy.sh</code> copies the integration and restarts
+Home Assistant. <code>scripts/tail_ha_log.sh</code> answers the only question that matters
+immediately after, which is whether it loaded. Both read the same environment variables from the
+same gitignored env file.</p>
+
+<blockquote>
+<p><strong>Three answers are still needed before either script runs.</strong> The install type of
+the instance, its hostname and port, and which apps are installed on it. Nothing here guesses
+them. The full list is in <code>docs/deploy-notes.md</code>.</p>
+</blockquote>
+
+<h2>1. Installation methods, ranked by loop speed</h2>
+
+<p>The reader of this page is iterating on Python many times per hour. That makes the edit to
+audible speech loop the deciding factor, not elegance and not how a stranger would install the
+finished thing.</p>
+
+<table>
+<thead>
+<tr><th>Method</th><th>Needs on the HA side</th><th>Survives an HA upgrade</th><th>Reload without restart</th><th>Loop speed</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>rsync over ssh</strong> into <code>config/custom_components/</code></td>
+  <td>Shell access. The SSH app, the OS host shell on 22222, or plain sshd on Container and Core</td>
+  <td>Yes. The config directory is not touched by an HA update</td>
+  <td>No. See section 3</td>
+  <td><strong>Fastest.</strong> One command, seconds, only changed files move</td>
+</tr>
+<tr>
+  <td><strong>Local copy into a bind mount</strong></td>
+  <td>Container or Core, with the config directory reachable as a path on the machine you edit on</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td><strong>Fastest.</strong> No network at all. Needs the right topology</td>
+</tr>
+<tr>
+  <td><strong>Samba share</strong>, drag the folder in</td>
+  <td>The Samba app, so OS or Supervised only</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Medium. Fine by hand, awkward to script, and SMB is slow on many small files</td>
+</tr>
+<tr>
+  <td><strong>Studio Code Server</strong>, edit in place</td>
+  <td>The app, and <code>aarch64</code> or <code>amd64</code>. Not 32 bit arm</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Medium. No copy step at all, but you are editing a second copy of the code that is not the git working tree</td>
+</tr>
+<tr>
+  <td><strong>git clone on the HA host</strong>, then <code>git pull</code></td>
+  <td>Shell access and <code>git</code> on the far side, which the SSH apps do not all ship</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Medium. Requires pushing before every test, so every experiment becomes a commit</td>
+</tr>
+<tr>
+  <td><strong>HACS custom repository</strong></td>
+  <td>HACS installed, and the repo reachable by GitHub URL</td>
+  <td>Yes, and HACS tracks and offers updates</td>
+  <td>No</td>
+  <td>Slowest. A tag or a release per iteration, then a click in the HACS UI. This is the shipping path, not the dev path</td>
+</tr>
+<tr>
+  <td><strong>Manual zip from a release</strong></td>
+  <td>Nothing beyond file access</td>
+  <td>Yes, but you own every update by hand</td>
+  <td>No</td>
+  <td>Slow. Useful for proving the release artifact works, useless for iteration</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Recommendation</h3>
+
+<p><strong>Use rsync over ssh for the whole of chapters 5 and 6, and use HACS exactly twice:</strong>
+once at the end of chapter 7 to prove the distribution path works on a clean instance, and once
+after the flip to public to prove a stranger can install it. If the instance is a Container install
+whose config directory is a bind mount from a host you can already write to, use the local
+transport instead and skip SSH entirely.</p>
+
+<p>The reason is not speed alone. rsync keeps the git working tree as the single source of truth. A
+Studio Code Server or Samba workflow tempts you into editing on the far side, and then the fix that
+made it work lives on the Pi and not in a commit. That failure mode is expensive precisely because
+the lab convention rewrites this history into build order later.</p>
+
+<h2>2. Every way to get a file onto a running instance</h2>
+
+<p>Install type decides most of this. Apps, which were called add-ons until Home Assistant 2026.2
+renamed them, need the Supervisor. Container and Core have no Supervisor, so half the table below
+does not exist for them. That is the detail that costs an afternoon.</p>
+
+<table>
+<thead>
+<tr><th>Path</th><th>HA OS</th><th>Supervised</th><th>Container</th><th>Core</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>Samba app</td><td>Yes</td><td>Yes</td><td class="no">No</td><td class="no">No</td>
+  <td>Exposes <code>config</code>, <code>share</code>, <code>ssl</code>, <code>backup</code>,
+  <code>media</code>, plus <code>local_apps</code> and <code>app_configs</code>, which were
+  <code>addons</code> and <code>addon_configs</code> before the rename. Both names still work.
+  Credentials are set in the app config and are not your HA login</td>
+</tr>
+<tr>
+  <td>Advanced SSH and Web Terminal app</td><td>Yes</td><td>Yes</td><td class="no">No</td><td class="no">No</td>
+  <td>Public key auth is the documented recommendation over a password. It runs in a container with
+  <code>/config</code> mapped, so a shell here is not a shell on the host. Alpine based, so
+  <code>rsync</code> and <code>git</code> are not guaranteed to be present</td>
+</tr>
+<tr>
+  <td>Studio Code Server app</td><td>Yes</td><td>Yes</td><td class="no">No</td><td class="no">No</td>
+  <td><code>aarch64</code> and <code>amd64</code> only. Maps <code>/config</code> writable. Browser
+  editor, no copy step, but nothing syncs back to git</td>
+</tr>
+<tr>
+  <td>OS host shell, SSH on port 22222</td><td>Yes</td><td class="no">n/a</td><td class="no">n/a</td><td class="no">n/a</td>
+  <td>Root on the host itself, independent of any app. Enabled by putting an
+  <code>authorized_keys</code> file at the root of a USB partition named <code>CONFIG</code>, case
+  sensitive, FAT or ext4 or NTFS, LF newlines, ASCII only, then rebooting. Physical access
+  required the first time</td>
+</tr>
+<tr>
+  <td><code>scp</code></td><td>Via an app or 22222</td><td>Yes</td><td>Yes, to the host</td><td>Yes</td>
+  <td>Works anywhere ssh works. Copies everything every time and cannot remove a stale file, so
+  it is the fallback rather than the plan</td>
+</tr>
+<tr>
+  <td><code>rsync</code> over ssh</td><td>Via an app or 22222</td><td>Yes</td><td>Yes, to the host</td><td>Yes</td>
+  <td>Needs <code>rsync</code> on <em>both</em> ends. Missing on the far side fails with a remote
+  command error, which reads like a permissions problem and is not. Confirm before blaming the
+  key</td>
+</tr>
+<tr>
+  <td>git clone on the HA host</td><td>Awkward</td><td>Yes</td><td>Yes</td><td>Yes</td>
+  <td>Needs <code>git</code> on the far side and credentials for a private repo. This repo is
+  private, so that means a deploy key or a token sitting on the Pi. Not worth it for iteration</td>
+</tr>
+<tr>
+  <td>Bind mount the config directory</td><td class="no">No</td><td class="no">No</td><td>Yes</td><td>Yes</td>
+  <td>The container runs with <code>-v /HOST/PATH:/config</code>. Write to the host path and the
+  file is already inside. This is the fastest loop available and the reason
+  <code>deploy.sh</code> has a <code>local</code> transport</td>
+</tr>
+<tr>
+  <td>HACS download</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td>
+  <td>HACS is an integration, not an app, so it works on every install type. It fetches into
+  <code>config/custom_components/</code> and then tracks the repo for updates</td>
+</tr>
+</tbody>
+</table>
+
+<p>One thing that is true on every install type: the config directory is yours, and a Home
+Assistant version upgrade does not remove anything from <code>custom_components/</code>. A custom
+integration surviving an upgrade is not the risk. The risk is the opposite, that an upgrade changes
+an API the integration used and the integration keeps sitting there failing to load. HANDOFF
+section 2.2 is a list of exactly that kind of breakage.</p>
+
+<h2>3. Reloading without restarting, honestly</h2>
+
+<p><strong>A custom integration's Python cannot be reloaded in place.</strong> Python caches
+imported modules in <code>sys.modules</code>. Once <code>custom_components.deepgram_tts.tts</code>
+is imported, that object is what the process has, and rewriting the file on disk changes nothing
+about the running interpreter. Home Assistant does not work around this, and neither does HACS.</p>
+
+<p>What the reload action actually does, quoting the Home Assistant docs for
+<code>homeassistant.reload_config_entry</code>: it "reloads an integration's config entry without
+restarting Home Assistant," and "reloading briefly unloads the integration, so its entities are
+unavailable for a moment while it sets up again." It takes an optional <code>entry_id</code> and can
+be targeted at an entity, device, area, floor, or label. It is admin only.</p>
+
+<p>So it re-runs <code>async_unload_entry</code> and <code>async_setup_entry</code> against the
+module that is already loaded. That is genuinely useful for some things and useless for others:</p>
+
+<table>
+<thead><tr><th>Change</th><th>What picks it up</th></tr></thead>
+<tbody>
+<tr><td>An option changed in the options flow</td><td>Reload the config entry</td></tr>
+<tr><td>A voice catalog that failed to fetch and should be retried</td><td>Reload the config entry</td></tr>
+<tr><td>An expired or replaced API key</td><td>Reload the config entry</td></tr>
+<tr><td>Any edit to a <code>.py</code> file</td><td><strong>Full restart.</strong> Nothing less</td></tr>
+<tr><td>A new or renamed module inside the integration</td><td><strong>Full restart</strong></td></tr>
+<tr><td><code>manifest.json</code>, including a version bump</td><td><strong>Full restart</strong></td></tr>
+<tr><td><code>strings.json</code> or <code>translations/en.json</code></td><td><strong>Full restart.</strong> Translations are cached at load</td></tr>
+<tr><td>A new entry in <code>requirements</code></td><td><strong>Full restart</strong>, and HA installs the package during startup, so that restart is slower than usual</td></tr>
+</tbody>
+</table>
+
+<p>Practical consequence for the loop: every code iteration costs one Home Assistant restart. On a
+Raspberry Pi that is tens of seconds, sometimes more than a minute. That cost is the argument for
+making the copy step instant and scripted, which is what <code>deploy.sh</code> is for, and for
+running the unit tests locally first so the restart is spent on something a test could not have
+caught.</p>
+
+<p>There is no supported hot reload hook for a TTS entity. Do not go looking for one. Chapter 6's
+websocket path is where a long lived connection makes restart cost feel worse, and the answer there
+is still a restart.</p>
+
+<h2>4. <code>scripts/deploy.sh</code></h2>
+
+<p>Every setting is an environment variable prefixed <code>HA_DEPLOY_</code>, documented in a block
+at the top of the script itself, so the script is its own reference. An optional env file is sourced
+first. Default location <code>scripts/.ha-deploy.env</code>, already added to
+<code>.gitignore</code>, override with <code>HA_DEPLOY_ENV_FILE</code>.</p>
+
+<p>An env file for the rsync transport:</p>
+
+<pre><code># scripts/.ha-deploy.env  (gitignored, never commit this)
+HA_DEPLOY_TRANSPORT=rsync
+HA_DEPLOY_SSH_HOST=REPLACE_ME
+HA_DEPLOY_SSH_USER=root
+HA_DEPLOY_SSH_PORT=22
+HA_DEPLOY_CONFIG_DIR=/config
+HA_DEPLOY_URL=http://REPLACE_ME:8123
+HA_DEPLOY_TOKEN=REPLACE_ME
+HA_DEPLOY_RESTART=restart
+</code></pre>
+
+<p>And for a bind mounted Container install, where no SSH is involved:</p>
+
+<pre><code>HA_DEPLOY_TRANSPORT=local
+HA_DEPLOY_CONFIG_DIR=/Users/samgutentag/path/to/ha/config
+HA_DEPLOY_URL=http://REPLACE_ME:8123
+HA_DEPLOY_TOKEN=REPLACE_ME
+</code></pre>
+
+<p>Then:</p>
+
+<pre><code>HA_DEPLOY_DRY_RUN=1 scripts/deploy.sh    # print the plan and an rsync dry run
+scripts/deploy.sh                        # copy, then restart
+</code></pre>
+
+<p>Behavior worth knowing before the first run:</p>
+
+<ul>
+<li><strong><code>HA_DEPLOY_TRANSPORT</code> has no default.</strong> Unset, the script fails with a
+message naming both valid values. Guessing wrong writes files to the wrong machine, so it does not
+guess.</li>
+<li><strong>It refuses to run if the source has no <code>manifest.json</code>.</strong> That is the
+guard that stops a typo'd path from becoming a destructive sync on the far side.</li>
+<li><strong>It never deletes on the destination by default.</strong> <code>rsync --delete</code> is
+behind <code>HA_DEPLOY_ALLOW_DELETE=1</code>, and the script header says why: delete removes
+whatever is on the destination and absent from the source, so a wrong
+<code>HA_DEPLOY_CONFIG_DIR</code> plus delete removes somebody else's integration, with no undo.
+The one legitimate reason to turn it on is a renamed or removed module leaving a stale
+<code>.py</code> that Home Assistant keeps importing.</li>
+<li><strong>The source path has no trailing slash on purpose.</strong> rsync then transfers the
+<code>deepgram_tts</code> directory itself, which also scopes any <code>--delete</code> to that one
+directory rather than to everything under <code>custom_components/</code>.</li>
+<li><strong>The restart step is skipped cleanly with no token.</strong> No
+<code>HA_DEPLOY_TOKEN</code> means the copy still happens and the script tells you to restart
+yourself. Create the token on the Home Assistant profile page, at the bottom under Long Lived
+Access Tokens.</li>
+<li><strong>It prints the plan before acting and one summary line after.</strong> The summary is the
+line you read out of a scrollback: version, transport, destination, what was copied, what was
+restarted, elapsed seconds. The token is never printed.</li>
+</ul>
+
+<p>A restart is <code>POST /api/services/homeassistant/restart</code>. There is no dedicated
+restart endpoint in the REST API; everything goes through
+<code>POST /api/services/&lt;domain&gt;/&lt;service&gt;</code> with an
+<code>Authorization: Bearer &lt;token&gt;</code> header. Setting
+<code>HA_DEPLOY_RESTART=reload</code> posts <code>homeassistant.reload_config_entry</code> with an
+<code>HA_DEPLOY_ENTRY_ID</code> instead, which is the right choice only for the config and catalog
+cases in section 3.</p>
+
+<h2>5. <code>scripts/tail_ha_log.sh</code></h2>
+
+<p>Same env file, same prefix. <code>HA_DEPLOY_LOG_SOURCE</code> picks <code>api</code> or
+<code>ssh</code> and has no default, for the same reason as the transport.</p>
+
+<pre><code>HA_DEPLOY_LOG_SOURCE=api scripts/tail_ha_log.sh      # poll /api/error_log, filtered
+HA_DEPLOY_LOG_SOURCE=ssh scripts/tail_ha_log.sh      # tail -F the log file over ssh
+HA_DEPLOY_LOG_FOLLOW=0 scripts/tail_ha_log.sh        # one shot, print the backlog and exit
+HA_DEPLOY_LOG_FILTER='.' scripts/tail_ha_log.sh      # everything, not just this integration
+</code></pre>
+
+<p>The default filter is
+<code>deepgram_tts|deepgram|DeepgramError|tts\.</code>, which catches the integration's own logger
+name, its typed errors, and the TTS component's lines.</p>
+
+<p>One honest limitation: <code>GET /api/error_log</code> returns, in the docs' words, "all errors
+logged during the current session of Home Assistant as a plaintext response." It is a whole
+document fetch, not a stream, and there is no server side tail. So the <code>api</code> source polls
+every <code>HA_DEPLOY_LOG_INTERVAL</code> seconds and prints what is new. A restart makes the log
+start over, which the script detects as the line count dropping and reports rather than silently
+printing nothing. The <code>ssh</code> source has none of that awkwardness because it is
+<code>tail -F</code> on a real file, but it needs shell access and it assumes the default logger is
+writing <code>home-assistant.log</code> into the config directory.</p>
+
+<h2>6. The release path</h2>
+
+<p><code>.github/workflows/release.yml</code> runs on a <code>v*</code> tag push, on a published
+release, and on manual dispatch with a tag. It does three things:</p>
+
+<ol>
+<li>Resolves the tag for whichever event fired, since a tag push and a published release carry it
+in different places.</li>
+<li>Compares <code>version</code> in <code>manifest.json</code> against the tag with the leading
+<code>v</code> stripped, and fails with a <code>::error</code> annotation on
+<code>manifest.json</code> when they differ. HACS reads the version from the manifest and not from
+the tag, so a mismatch ships a build that reports the wrong version to every user, forever.</li>
+<li>Zips the contents of <code>custom_components/deepgram_tts/</code> with the files at the archive
+root, lists the archive so the log shows what shipped, and attaches it to the release using the
+<code>gh</code> CLI that is already on the runner. No third party action, so no new dependency in
+the release path.</li>
+</ol>
+
+<p><code>hacs.json</code> currently has <code>"zip_release": false</code>, and this work does not
+change that. The zip is still worth attaching, for manual installs and for anyone not running HACS.
+<code>docs/deploy-notes.md</code> records what would have to change together if that flag ever
+flips, which is a <code>filename</code> key in <code>hacs.json</code>, an exact match between that
+name and the asset name, and a guarantee that every future release carries the asset.</p>
+
+<h2>7. Real hardware checklist</h2>
+
+<p>This closes the chapter 5 gate from HANDOFF section 6.1. Work down it, one box at a time. Do not
+start chapter 6 with an unchecked box above this line.</p>
+
+<h3>Before the first deploy</h3>
+
+<ul class="check">
+<li><input type="checkbox"> Answer the three questions in <code>docs/deploy-notes.md</code>: install
+type, hostname and port, which apps are installed.</li>
+<li><input type="checkbox"> Create a long lived access token at
+<code>&lt;ha-url&gt;/profile</code>, bottom of the page, and put it in
+<code>scripts/.ha-deploy.env</code>.</li>
+<li><input type="checkbox"> Confirm the env file is ignored:
+<code>git check-ignore -v scripts/.ha-deploy.env</code> prints a rule.</li>
+<li><input type="checkbox"> Confirm the API answers at all:
+<code>curl -H "Authorization: Bearer $TOKEN" $URL/api/ | grep -i running</code>.</li>
+<li><input type="checkbox"> Run <code>HA_DEPLOY_DRY_RUN=1 scripts/deploy.sh</code> and read the
+plan. Confirm the destination path is the one you meant.</li>
+<li><input type="checkbox"> Tests green locally first:
+<code>.venv/bin/pytest -q</code>. Every restart is tens of seconds, so do not spend one on
+something a test would have caught.</li>
+</ul>
+
+<h3>Deploy and confirm it loaded</h3>
+
+<ul class="check">
+<li><input type="checkbox"> <code>scripts/deploy.sh</code>. Read the summary line. Copy happened,
+restart requested, no error.</li>
+<li><input type="checkbox"> <code>HA_DEPLOY_LOG_SOURCE=api scripts/tail_ha_log.sh</code> in a second
+terminal, through the restart.</li>
+<li><input type="checkbox"> No <code>Error while setting up deepgram_tts platform</code>, no
+<code>Unable to prepare setup for platform</code>, no
+<code>ModuleNotFoundError</code>, no <code>Setup failed for custom integration</code> in the log.
+A traceback naming a package we did not declare is the exact failure from HANDOFF section 2.1,
+so read it rather than retrying.</li>
+<li><input type="checkbox"> Settings, Devices and services shows <strong>Deepgram TTS</strong> with
+no error card, and an entry titled for the chosen voice.</li>
+<li><input type="checkbox"> Developer Tools, States has a <code>tts.</code> entity for it. Write
+down its entity id. The YAML below needs it, and it is derived from the entry title so it is not
+guessable from this page.</li>
+</ul>
+
+<h3>Confirm <code>flux-haley-en</code> is the default on a fresh install</h3>
+
+<ul class="check">
+<li><input type="checkbox"> Do this on an entry added <em>after</em> this deploy, not on one carried
+over. A pre-existing entry has a stored voice and proves nothing about the default.</li>
+<li><input type="checkbox"> Add the integration fresh. The voice step's preselected value is
+<strong>Haley</strong>, and the entry title reads <code>Deepgram Flux (Haley)</code>.</li>
+<li><input type="checkbox"> Confirm it against the stored data rather than the UI label:
+<code>Developer Tools, Template</code>, render
+<code>{{ state_attr('tts.YOUR_ENTITY', 'friendly_name') }}</code>, and separately check the entry's
+options in the UI show voice <code>flux-haley-en</code>.</li>
+<li><input type="checkbox"> Sanity check the reason it is the default: <code>flux-marcus-en</code>
+and <code>flux-brittany-en</code> drift in pitch and volume between calls and can click at clip
+starts, which a house full of short separate calls makes audible. Both are cleared for use and
+belong in the picker. Neither should be preselected.</li>
+</ul>
+
+<h3>Confirm <code>tts.speak</code> produces audio</h3>
+
+<ul class="check">
+<li><input type="checkbox"> Paste this into Developer Tools, Actions, YAML mode, and run it.
+Replace both ids with real ones from Developer Tools, States.</li>
+</ul>
+
+<pre><code>action: tts.speak
+target:
+  entity_id: tts.REPLACE_ME
+data:
+  media_player_entity_id: media_player.REPLACE_ME
+  message: "Your appointment is confirmed for 3pm tomorrow."
+  cache: false
+</code></pre>
+
+<ul class="check">
+<li><input type="checkbox"> Audio actually comes out of the speaker. Not just an action that
+returned without raising.</li>
+<li><input type="checkbox"> <code>cache: false</code> stayed in the call. With caching on, the
+second run answers from disk and you stop testing the integration.</li>
+<li><input type="checkbox"> The log shows one request and no traceback. No repeated retry, no
+<code>DeepgramAuthError</code>, no <code>DeepgramConnectionError</code>.</li>
+<li><input type="checkbox"> Run the same call a second time and confirm it is not slower than the
+first in a way that suggests a per-call catalog fetch.</li>
+<li><input type="checkbox"> Run it through the Assist pipeline too, not only the direct action.
+HANDOFF section 2.1 is the record of a bug that broke every pipeline response while direct
+<code>tts.speak</code> kept working, so testing one does not test the other.</li>
+</ul>
+
+<h3>Confirm a Spanish pipeline resolves Aura and not Flux</h3>
+
+<p>Every Flux voice is English. A Spanish request resolving to a Flux voice is the single most
+likely correctness bug in chapter 5, and it will not raise. It will just speak Spanish words in an
+English voice, which sounds wrong and is easy to talk yourself out of hearing.</p>
+
+<ul class="check">
+<li><input type="checkbox"> Turn on debug logging for the integration first, so the resolved voice
+id is in the log rather than inferred from the audio. In
+<code>configuration.yaml</code>, then restart:</li>
+</ul>
+
+<pre><code>logger:
+  default: warning
+  logs:
+    custom_components.deepgram_tts: debug
+</code></pre>
+
+<ul class="check">
+<li><input type="checkbox"> If chapter 5 does not log the resolved voice id, add one debug line that
+does, in <code>tts.py</code>, and deploy again. Confirming this by ear is not confirming it.</li>
+<li><input type="checkbox"> Run the Spanish call:</li>
+</ul>
+
+<pre><code>action: tts.speak
+target:
+  entity_id: tts.REPLACE_ME
+data:
+  media_player_entity_id: media_player.REPLACE_ME
+  language: es
+  cache: false
+  message: "Tu cita esta confirmada para manana a las tres de la tarde."
+</code></pre>
+
+<ul class="check">
+<li><input type="checkbox"> The log line names an <code>aura-2-</code> or <code>aura-</code> model.
+Anything starting <code>flux-</code> is the bug.</li>
+<li><input type="checkbox"> The audio is a Spanish voice, not an American English voice reading
+Spanish.</li>
+<li><input type="checkbox"> Repeat with <code>language: de</code>. Same expectation. Two languages
+confirms the routing rule, one confirms a coincidence.</li>
+<li><input type="checkbox"> Check the language dropdown in the entity's options shows base codes
+only. A list mixing <code>en</code> and <code>en-US</code> is the <code>split("_")</code> bug from
+HANDOFF section 2.2 come back.</li>
+</ul>
+
+<h3>Capture the evidence</h3>
+
+<p>This is the part that gets skipped and then wanted three weeks later, when the build log post
+needs a real log line and not a paraphrase. <code>scripts/out/</code> is already gitignored, so it
+is the place to put all of it.</p>
+
+<ul class="check">
+<li><input type="checkbox"> Record the four numbers that date the run: Home Assistant version from
+Settings, About; the integration version from <code>manifest.json</code>; the install type; and the
+git SHA you deployed, <code>git rev-parse --short HEAD</code>.</li>
+<li><input type="checkbox"> Save the whole log from the run, not just the lines you liked:
+<code>curl -H "Authorization: Bearer $TOKEN" "$URL/api/error_log" &gt; scripts/out/error-log-$(date +%Y%m%d-%H%M).txt</code></li>
+<li><input type="checkbox"> Save the two audio files. A direct call to <code>/v2/speak</code> with
+the same text gives you a reference clip next to what Home Assistant played.</li>
+<li><input type="checkbox"> Screenshot the successful <code>tts.speak</code> action in Developer
+Tools, and the integration card with no error on it. Screenshots age better than remembered
+outcomes.</li>
+<li><input type="checkbox"> Screenshot the voice picker on a fresh add, showing Haley preselected.
+That one image is the whole default-voice claim.</li>
+<li><input type="checkbox"> Write what surprised you into <code>.hub/ledger.md</code>, while you
+still remember the symptom you saw before you knew the cause. The ledger is append-only and exists
+for exactly the facts a later repo scan cannot recover.</li>
+<li><input type="checkbox"> Note the wall clock time from action to first audible sound. It is not a
+real latency measurement and should not be published as one, but it is the baseline chapter 6 has
+to beat, and HANDOFF section 7 already flags first-frame latency as unmeasured.</li>
+</ul>
+
+<h3>Gate</h3>
+
+<ul class="check">
+<li><input type="checkbox"> Every box above is checked, and chapter 6 can start.</li>
+<li><input type="checkbox"> Do not start <code>/advocacy-intake</code> yet. HANDOFF section 8.5 puts
+that after chapter 5 is on real hardware, and the honest claim is not ready until this checklist is
+done and the streaming work has a result.</li>
+</ul>
+
+<h2>8. What is still unanswered</h2>
+
+<p>Short list, kept in full in <code>docs/deploy-notes.md</code>.</p>
+
+<ol>
+<li>The install type, hostname and port, and installed apps of the instance. Three answers, thirty
+seconds, and both scripts are configured.</li>
+<li>Whether the config directory is a bind mount this laptop can write to. If yes, the
+<code>local</code> transport is faster than everything else here.</li>
+<li>Whether the far side has <code>rsync</code>. The official SSH apps are Alpine based and do not
+all ship it, and its absence fails at the remote end in a way that reads like a key problem.</li>
+<li>Whether a <code>home-assistant.log</code> file exists on disk. The <code>ssh</code> log source
+assumes it; the <code>api</code> source does not care.</li>
+<li><code>shellcheck</code> is not installed on this machine, so both scripts were verified with
+<code>bash -n</code> only. Worth one <code>shellcheck</code> run before the flip to public.</li>
+</ol>
+
+<h2>Sources</h2>
+
+<ul class="src">
+<li>Home Assistant REST API, endpoints and Bearer auth:
+<code>developers.home-assistant.io/docs/api/rest/</code></li>
+<li><code>homeassistant.reload_config_entry</code>:
+<code>home-assistant.io/actions/homeassistant.reload_config_entry/</code></li>
+<li>Installation methods and the OS versus Container feature table:
+<code>home-assistant.io/installation/</code></li>
+<li>2026.2 release notes, add-ons renamed to apps and the panel refactor:
+<code>home-assistant.io/blog/2026/02/04/release-20262/</code></li>
+<li>Samba app shares, including the <code>local_apps</code> and <code>app_configs</code> rename:
+<code>github.com/home-assistant/addons/blob/master/samba/DOCS.md</code></li>
+<li>Advanced SSH and Web Terminal app, authorized keys over passwords:
+<code>github.com/hassio-addons/addon-ssh</code></li>
+<li>Studio Code Server architectures and directory mappings:
+<code>github.com/hassio-addons/addon-vscode</code>, <code>vscode/config.yaml</code></li>
+<li>Home Assistant OS host shell on port 22222 and the USB <code>CONFIG</code> partition:
+<code>developers.home-assistant.io/docs/operating-system/debugging/</code></li>
+<li>HACS integration publishing requirements:
+<code>hacs.xyz/docs/publish/integration/</code></li>
+<li>HACS <code>hacs.json</code> keys, <code>zip_release</code> and <code>filename</code>:
+<code>hacs.xyz/docs/publish/start/</code></li>
+<li><code>tts.speak</code> action YAML: <code>home-assistant.io/integrations/tts/</code></li>
+</ul>
+
+<p class="meta">Deepgram TTS for Home Assistant. Written 2026-09-15 against Home Assistant
+2026.9.x. Derived from HANDOFF sections 6 and 6.1. Companion notes:
+<code>docs/deploy-notes.md</code>.</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>
