@@ -254,3 +254,59 @@ asserts `async_supports_streaming_input()` is False, so that assertion failing i
 that chapter 6 arrived and the merge is a deliberate act.
 Source: HANDOFF.md section 2.1 · tests/test_tts.py, the streaming guard assertion
 Routes to: technical blog post, and this is probably the post's strongest single section
+
+### [decision] The WAV header's sample rate is an assertion, so the client checks its own math
+The Flux socket emits raw `linear16` with no container, and nothing in the protocol tells the
+client what rate those samples are at. `Connected` carries the model name and uuids, not a
+format. So the 44 byte WAV header prepended to the stream declares a rate that the code
+believes rather than a rate it was told.
+What lost: inferring the rate, or trusting a documented default. Either is a guess, and a guess
+that is wrong by a factor of two produces audio that plays at the wrong pitch. **Wrong-pitch
+audio sounds like a bad voice, not like a bug**, so it would get blamed on Deepgram's voice
+quality and never traced to a header.
+What was chosen: pin the format in the socket query string, `encoding=linear16` and an explicit
+`sample_rate`, so the request and the header agree by construction. Then check it at runtime:
+bytes received against the `audio_duration_ms` that `SpeechMetadata` reports. A mismatch outside
+ten percent logs the rate the stream actually implies.
+Deliberately a warning and not an error. Audio at the wrong pitch still beats silence out of a
+speaker in somebody's kitchen.
+Source: custom_components/deepgram_tts/stream.py `_check_sample_rate` · tests/test_stream.py::test_sample_rate_mismatch_warns_and_does_not_raise
+Routes to: technical blog post, and the first live socket run confirms or kills it
+
+### [decision] A streaming WAV declares an unknown length, which is the whole point
+A RIFF header carries two byte counts, and a stream does not know either of them until it ends.
+What lost: buffering the audio to compute the real sizes, which is the one thing streaming
+exists to avoid, and would have made chapter 6 a slower version of chapter 5.
+What was chosen: the all-ones sentinel in both fields. ffmpeg, which is what Home Assistant
+converts with in `_async_convert_audio`, reads to end of stream when it sees that.
+Unverified: whether every playback path Home Assistant can hand this to is as tolerant as
+ffmpeg. A media player that insists on a real length would reject the clip. That is a hardware
+question and it is in the bill of materials for a reason.
+Source: custom_components/deepgram_tts/stream.py `wav_header` · tests/test_stream.py::test_wav_header_declares_unknown_length
+Routes to: the real-hardware checklist, technical blog post
+
+### [friction] The socket's own error was replaced by the cleanup's CancelledError
+Symptom: three tests that assert a specific failure got `asyncio.exceptions.CancelledError`
+raised from a bare `yield` inside `asyncio.sleep`, with no mention of the socket anywhere in the
+traceback. The real failure had vanished.
+Cause: when the receive loop raises, the `finally` cancels the sender task and awaits it. The
+handler caught `Exception`, and `CancelledError` derives from `BaseException`, so it went
+straight through and replaced the error that actually mattered.
+Fix: catch `CancelledError` explicitly and swallow it **only when `sender.cancelled()` is true**,
+meaning we are the ones who cancelled it. If the task is not cancelled, the cancellation came
+from outside and swallowing it would make the whole coroutine uncancellable.
+Worth writing down because the naive fix, suppressing `CancelledError` outright, passes every
+test in this file and quietly breaks shutdown.
+Source: custom_components/deepgram_tts/stream.py `_finish_sender`
+Routes to: technical blog post, and a gotchas post about async cleanup
+
+### [claim] The fake socket proves the interleaving, which a fixed message script cannot
+The test double answers `Speak` with audio and `Flush` with `SpeechMetadata`, as a state machine
+rather than a fixed list of messages. That choice is the test.
+A fixed script passes even for an implementation that sends every chunk before reading anything,
+which is exactly the implementation that deletes the benefit of streaming while looking correct.
+The state machine makes `test_audio_arrives_before_the_text_runs_out` meaningful: it asserts the
+first audio frame is yielded while fewer than five of five chunks have been sent.
+It held. 17 socket tests, 62 in the suite.
+Source: tests/test_stream.py · `.venv/bin/pytest -q` → `62 passed in 0.46s`
+Routes to: technical blog post, the testing section
