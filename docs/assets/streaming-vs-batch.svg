@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 316" width="660" height="316" role="img" aria-label="A shared time axis compares two ways of getting the same spoken reply. The batch lane posts once to /v2/speak and sits silent for 1.6 seconds before a single clip arrives. The streaming lane sends one Speak message per chunk over a websocket and binary audio frames begin at 0.25 seconds, between SpeechStarted and SpeechMetadata. An amber playhead sweeps left to right and the filled regions grow behind it, so the streaming lane is already making sound while the batch lane is still silent.">
+  <!--
+    generate-animations timing plan. 6s loop.
+    The playhead maps 0 to 2.0 seconds of wall clock onto 0 to 60% of the timeline,
+    so 1 second of wall clock is 30% of the timeline. Finished frame holds 60% to 100%.
+      batch silence fills   0 to 1.6s    :  0% to 48%
+      batch clip fills      1.6 to 2.0s  : 48% to 60%
+      stream audio fills    0.25 to 2.0s : 7.5% to 60%
+    Reads frozen: axis, lanes, chips, socket markers and both first sound lines are static.
+  -->
+  <style>
+    .fill { transform-box: fill-box; transform-origin: left center; }
+    .fillSilent { animation: dgSilent 6s linear infinite; }
+    .fillClip { animation: dgClip 6s linear infinite; }
+    .fillStream { animation: dgStream 6s linear infinite; }
+    .playhead { animation: dgPlay 6s linear infinite; }
+    @keyframes dgSilent { 0% { transform: scaleX(0); } 48%, 100% { transform: scaleX(1); } }
+    @keyframes dgClip { 0%, 48% { transform: scaleX(0); } 60%, 100% { transform: scaleX(1); } }
+    @keyframes dgStream { 0%, 7.5% { transform: scaleX(0); } 60%, 100% { transform: scaleX(1); } }
+    @keyframes dgPlay { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(470px); } }
+    @media (prefers-reduced-motion: reduce) {
+      .fillSilent, .fillClip, .fillStream, .playhead { animation: none; }
+      .fill { transform: scaleX(1); }
+      .playhead { transform: translateX(470px); }
+    }
+  </style>
+
+  <rect x="0" y="0" width="660" height="316" rx="10" fill="#ffffff"/>
+  <text x="16" y="26" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#3a4350">Same reply, same voice, different moment of first sound</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+
+    <line x1="526" y1="54" x2="526" y2="248" stroke="#346DDB" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <line x1="209" y1="54" x2="209" y2="248" stroke="#18a394" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="209" y="206" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0e7d70">first sound 0.25 s</text>
+    <text x="526" y="224" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1f5fc0">first sound 1.6 s</text>
+
+    <text x="16" y="72" font-size="11.5" font-weight="700" fill="#3a4350">Batch</text>
+    <text x="16" y="88" font-size="9.5" font-family="ui-monospace, monospace" fill="#5b6573">POST /v2/speak</text>
+    <rect x="150" y="64" width="376" height="24" rx="4" fill="#ffffff" stroke="#9aa3b0" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <rect class="fill fillSilent" x="150" y="64" width="376" height="24" rx="4" fill="#eef1f5"/>
+    <text x="338" y="80" text-anchor="middle" font-size="11" fill="#5b6573">silence, waiting for the whole clip</text>
+    <rect x="526" y="64" width="94" height="24" rx="4" fill="#ffffff" stroke="#346DDB" stroke-width="1.5"/>
+    <rect class="fill fillClip" x="526" y="64" width="94" height="24" rx="4" fill="#e3edfc"/>
+    <g stroke="#1f5fc0" stroke-width="1.4" opacity="0.75">
+      <line x1="538" y1="70" x2="538" y2="82"/><line x1="548" y1="67" x2="548" y2="85"/>
+      <line x1="558" y1="71" x2="558" y2="81"/><line x1="568" y1="66" x2="568" y2="86"/>
+      <line x1="578" y1="70" x2="578" y2="82"/><line x1="588" y1="68" x2="588" y2="84"/>
+      <line x1="598" y1="71" x2="598" y2="81"/><line x1="608" y1="67" x2="608" y2="85"/>
+    </g>
+    <text x="573" y="104" text-anchor="middle" font-size="10" fill="#1f5fc0">one clip</text>
+    <text x="628" y="80" font-size="11" fill="#9aa3b0">&#8594;</text>
+
+    <text x="16" y="152" font-size="11.5" font-weight="700" fill="#3a4350">Streaming</text>
+    <text x="16" y="168" font-size="9.5" font-family="ui-monospace, monospace" fill="#5b6573">wss /v2/speak</text>
+    <g>
+      <rect x="162" y="110" width="52" height="20" rx="5" fill="#eee7fb" stroke="#7c5cdb" stroke-width="1.3"/>
+      <text x="188" y="124" text-anchor="middle" font-size="9.5" fill="#5a3fb0">Speak</text>
+      <rect x="236" y="110" width="52" height="20" rx="5" fill="#eee7fb" stroke="#7c5cdb" stroke-width="1.3"/>
+      <text x="262" y="124" text-anchor="middle" font-size="9.5" fill="#5a3fb0">Speak</text>
+      <rect x="318" y="110" width="52" height="20" rx="5" fill="#eee7fb" stroke="#7c5cdb" stroke-width="1.3"/>
+      <text x="344" y="124" text-anchor="middle" font-size="9.5" fill="#5a3fb0">Speak</text>
+      <rect x="400" y="110" width="52" height="20" rx="5" fill="#eee7fb" stroke="#7c5cdb" stroke-width="1.3"/>
+      <text x="426" y="124" text-anchor="middle" font-size="9.5" fill="#5a3fb0">Speak</text>
+      <rect x="470" y="110" width="52" height="20" rx="5" fill="#ffffff" stroke="#7c5cdb" stroke-width="1.3" stroke-dasharray="4 3"/>
+      <text x="496" y="124" text-anchor="middle" font-size="9.5" fill="#5a3fb0">Flush</text>
+    </g>
+    <text x="580" y="124" text-anchor="middle" font-size="9.5" fill="#5b6573">text out</text>
+    <rect x="209" y="144" width="411" height="24" rx="4" fill="#ffffff" stroke="#18a394" stroke-width="1.5"/>
+    <rect class="fill fillStream" x="209" y="144" width="411" height="24" rx="4" fill="#e2f4f1"/>
+    <g stroke="#0e7d70" stroke-width="1.4" opacity="0.75">
+      <line x1="220" y1="150" x2="220" y2="162"/><line x1="232" y1="147" x2="232" y2="165"/>
+      <line x1="244" y1="151" x2="244" y2="161"/><line x1="256" y1="146" x2="256" y2="166"/>
+      <line x1="268" y1="150" x2="268" y2="162"/><line x1="280" y1="148" x2="280" y2="164"/>
+      <line x1="292" y1="151" x2="292" y2="161"/><line x1="304" y1="146" x2="304" y2="166"/>
+      <line x1="316" y1="150" x2="316" y2="162"/><line x1="328" y1="147" x2="328" y2="165"/>
+      <line x1="340" y1="151" x2="340" y2="161"/><line x1="352" y1="146" x2="352" y2="166"/>
+      <line x1="364" y1="150" x2="364" y2="162"/><line x1="376" y1="148" x2="376" y2="164"/>
+      <line x1="388" y1="151" x2="388" y2="161"/><line x1="400" y1="146" x2="400" y2="166"/>
+      <line x1="412" y1="150" x2="412" y2="162"/><line x1="424" y1="147" x2="424" y2="165"/>
+      <line x1="436" y1="151" x2="436" y2="161"/><line x1="448" y1="146" x2="448" y2="166"/>
+      <line x1="460" y1="150" x2="460" y2="162"/><line x1="472" y1="148" x2="472" y2="164"/>
+      <line x1="484" y1="151" x2="484" y2="161"/><line x1="496" y1="146" x2="496" y2="166"/>
+      <line x1="508" y1="150" x2="508" y2="162"/><line x1="520" y1="147" x2="520" y2="165"/>
+      <line x1="532" y1="151" x2="532" y2="161"/><line x1="544" y1="146" x2="544" y2="166"/>
+      <line x1="556" y1="150" x2="556" y2="162"/><line x1="568" y1="148" x2="568" y2="164"/>
+      <line x1="580" y1="151" x2="580" y2="161"/><line x1="592" y1="146" x2="592" y2="166"/>
+      <line x1="604" y1="150" x2="604" y2="162"/><line x1="616" y1="147" x2="616" y2="165"/>
+    </g>
+    <text x="628" y="160" font-size="11" fill="#9aa3b0">&#8594;</text>
+
+    <g>
+      <polygon points="197,136 202,144 192,144" fill="#18a394"/>
+      <text x="200" y="186" text-anchor="middle" font-size="9.5" font-family="ui-monospace, monospace" fill="#0e7d70">SpeechStarted</text>
+      <polygon points="536,136 541,144 531,144" fill="#18a394"/>
+      <text x="540" y="186" text-anchor="middle" font-size="9.5" font-family="ui-monospace, monospace" fill="#0e7d70">SpeechMetadata</text>
+    </g>
+
+    <line x1="150" y1="248" x2="628" y2="248" stroke="#9aa3b0" stroke-width="1.5"/>
+    <g stroke="#9aa3b0" stroke-width="1.5">
+      <line x1="150" y1="248" x2="150" y2="254"/>
+      <line x1="267" y1="248" x2="267" y2="254"/>
+      <line x1="385" y1="248" x2="385" y2="254"/>
+      <line x1="502" y1="248" x2="502" y2="254"/>
+      <line x1="620" y1="248" x2="620" y2="254"/>
+    </g>
+    <g font-size="9.5" fill="#5b6573" text-anchor="middle">
+      <text x="150" y="266">0 s</text>
+      <text x="267" y="266">0.5</text>
+      <text x="385" y="266">1.0</text>
+      <text x="502" y="266">1.5</text>
+      <text x="620" y="266">2.0</text>
+    </g>
+    <text x="16" y="266" font-size="9.5" fill="#5b6573">time</text>
+
+    <g class="playhead">
+      <line x1="150" y1="50" x2="150" y2="250" stroke="#e8932a" stroke-width="2"/>
+      <circle cx="150" cy="50" r="4" fill="#e8932a"/>
+    </g>
+
+    <text x="16" y="296" font-size="11.5" fill="#5b6573">Streaming starts talking 1.35 seconds earlier because it never waits for the last word.</text>
+  </g>
+</svg>

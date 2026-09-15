@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 256" width="660" height="256" role="img" aria-label="LLM tokens arrive continuously on the left and travel into one open websocket as Speak messages. Inside the Deepgram /v2/speak box, three dashed marks numbered one, two and three show the flush boundaries the server places for itself. Audio frames leave on the right as a continuous waveform with no seams. Amber dots flow along both arrows and a highlight sweeps across the incoming text and the outgoing audio, pulsing each boundary badge as it passes.">
+  <!--
+    generate-animations timing plan. 3s continuous loop, because the mechanism is a flow
+    with no end state to hold.
+      token dots travel the inbound arrow, staggered by 1s
+      the inbound highlight sweeps the text ribbon over 3s
+      boundary badges pulse as the highlight reaches them: 27%, 54%, 81%
+      the outbound highlight sweeps the audio ribbon 0.25s behind it
+    Reads frozen: boxes, ribbons, the three numbered boundary marks and every label
+    are static. Only the dots and the sweeps move.
+  -->
+  <style>
+    .dot { animation: dgDot 3s linear infinite; }
+    .dot2 { animation-delay: -1s; }
+    .dot3 { animation-delay: -2s; }
+    .sweepIn { animation: dgSweep 3s linear infinite; }
+    .sweepOut { animation: dgSweep 3s linear infinite; animation-delay: -0.25s; }
+    .bdg1 { animation: dgB1 3s linear infinite; }
+    .bdg2 { animation: dgB2 3s linear infinite; }
+    .bdg3 { animation: dgB3 3s linear infinite; }
+    @keyframes dgDot {
+      0% { transform: translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateX(78px); opacity: 0; }
+    }
+    @keyframes dgSweep {
+      0% { transform: translateX(0); opacity: 0; }
+      8% { opacity: 0.55; }
+      92% { opacity: 0.55; }
+      100% { transform: translateX(160px); opacity: 0; }
+    }
+    @keyframes dgB1 { 0%, 20% { opacity: 0.35; } 27% { opacity: 1; } 36%, 100% { opacity: 0.35; } }
+    @keyframes dgB2 { 0%, 47% { opacity: 0.35; } 54% { opacity: 1; } 63%, 100% { opacity: 0.35; } }
+    @keyframes dgB3 { 0%, 74% { opacity: 0.35; } 81% { opacity: 1; } 90%, 100% { opacity: 0.35; } }
+    @media (prefers-reduced-motion: reduce) {
+      .dot, .sweepIn, .sweepOut, .bdg1, .bdg2, .bdg3 { animation: none; }
+      .dot, .sweepIn, .sweepOut { opacity: 0; }
+      .bdg1, .bdg2, .bdg3 { opacity: 1; }
+    }
+  </style>
+
+  <defs>
+    <marker id="dgArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9aa3b0"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="660" height="256" rx="10" fill="#ffffff"/>
+  <text x="16" y="26" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="700" fill="#3a4350">The server decides where to breathe</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+
+    <rect x="16" y="62" width="124" height="58" rx="8" fill="#eee7fb" stroke="#7c5cdb" stroke-width="1.5"/>
+    <text x="78" y="86" text-anchor="middle" font-size="11.5" font-weight="700" fill="#5a3fb0">LLM tokens</text>
+    <text x="78" y="103" text-anchor="middle" font-size="10" fill="#5a3fb0">as they arrive</text>
+    <text x="16" y="138" font-size="9.5" fill="#5b6573">no split, no buffer</text>
+
+    <line x1="146" y1="91" x2="226" y2="91" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#dgArrow)"/>
+    <text x="186" y="80" text-anchor="middle" font-size="10" fill="#5b6573">Speak</text>
+    <text x="186" y="108" text-anchor="middle" font-size="9" font-family="ui-monospace, monospace" fill="#5b6573">one per chunk</text>
+    <g fill="#e8932a">
+      <circle class="dot" cx="150" cy="91" r="3.2"/>
+      <circle class="dot dot2" cx="150" cy="91" r="3.2"/>
+      <circle class="dot dot3" cx="150" cy="91" r="3.2"/>
+    </g>
+
+    <rect x="232" y="44" width="206" height="120" rx="8" fill="#f7f9fc" stroke="#9aa3b0" stroke-width="1.5"/>
+    <text x="335" y="63" text-anchor="middle" font-size="10" font-family="ui-monospace, monospace" fill="#3a4350">Deepgram /v2/speak</text>
+
+    <rect x="244" y="72" width="182" height="18" rx="4" fill="#ffffff" stroke="#7c5cdb" stroke-width="1.3" stroke-dasharray="4 3"/>
+    <g fill="#eee7fb" stroke="#7c5cdb" stroke-width="0.9">
+      <rect x="249" y="77" width="14" height="8" rx="2"/>
+      <rect x="269" y="77" width="14" height="8" rx="2"/>
+      <rect x="289" y="77" width="14" height="8" rx="2"/>
+      <rect x="309" y="77" width="14" height="8" rx="2"/>
+      <rect x="329" y="77" width="14" height="8" rx="2"/>
+      <rect x="349" y="77" width="14" height="8" rx="2"/>
+      <rect x="369" y="77" width="14" height="8" rx="2"/>
+      <rect x="389" y="77" width="14" height="8" rx="2"/>
+      <rect x="409" y="77" width="14" height="8" rx="2"/>
+    </g>
+    <rect class="sweepIn" x="244" y="72" width="22" height="18" rx="4" fill="#e8932a" opacity="0"/>
+
+    <g stroke="#e8932a" stroke-width="1.6" stroke-dasharray="3 3">
+      <line x1="290" y1="70" x2="290" y2="144"/>
+      <line x1="335" y1="70" x2="335" y2="144"/>
+      <line x1="380" y1="70" x2="380" y2="144"/>
+    </g>
+    <g class="bdg1" opacity="0.35">
+      <circle cx="290" cy="101" r="7.5" fill="#e8932a" stroke="#ffffff" stroke-width="1.3"/>
+      <text x="290" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">1</text>
+    </g>
+    <g class="bdg2" opacity="0.35">
+      <circle cx="335" cy="101" r="7.5" fill="#e8932a" stroke="#ffffff" stroke-width="1.3"/>
+      <text x="335" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">2</text>
+    </g>
+    <g class="bdg3" opacity="0.35">
+      <circle cx="380" cy="101" r="7.5" fill="#e8932a" stroke="#ffffff" stroke-width="1.3"/>
+      <text x="380" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">3</text>
+    </g>
+
+    <rect x="244" y="112" width="182" height="26" rx="4" fill="#e2f4f1" stroke="#18a394" stroke-width="1.3"/>
+    <g stroke="#0e7d70" stroke-width="1.4" opacity="0.8">
+      <line x1="252" y1="119" x2="252" y2="131"/><line x1="264" y1="116" x2="264" y2="134"/>
+      <line x1="276" y1="120" x2="276" y2="130"/><line x1="288" y1="115" x2="288" y2="135"/>
+      <line x1="300" y1="119" x2="300" y2="131"/><line x1="312" y1="117" x2="312" y2="133"/>
+      <line x1="324" y1="120" x2="324" y2="130"/><line x1="336" y1="115" x2="336" y2="135"/>
+      <line x1="348" y1="119" x2="348" y2="131"/><line x1="360" y1="116" x2="360" y2="134"/>
+      <line x1="372" y1="120" x2="372" y2="130"/><line x1="384" y1="115" x2="384" y2="135"/>
+      <line x1="396" y1="119" x2="396" y2="131"/><line x1="408" y1="117" x2="408" y2="133"/>
+      <line x1="420" y1="120" x2="420" y2="130"/>
+    </g>
+    <rect class="sweepOut" x="244" y="112" width="22" height="26" rx="4" fill="#e8932a" opacity="0"/>
+
+    <text x="335" y="157" text-anchor="middle" font-size="10" fill="#5b6573">flush points, chosen in here</text>
+
+    <line x1="444" y1="126" x2="524" y2="126" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#dgArrow)"/>
+    <text x="484" y="115" text-anchor="middle" font-size="10" fill="#5b6573">audio frames</text>
+    <text x="484" y="143" text-anchor="middle" font-size="9" font-family="ui-monospace, monospace" fill="#5b6573">linear16</text>
+    <g fill="#e8932a">
+      <circle class="dot" cx="448" cy="126" r="3.2"/>
+      <circle class="dot dot2" cx="448" cy="126" r="3.2"/>
+      <circle class="dot dot3" cx="448" cy="126" r="3.2"/>
+    </g>
+
+    <rect x="530" y="98" width="114" height="56" rx="8" fill="#e2f4f1" stroke="#18a394" stroke-width="1.5"/>
+    <text x="587" y="122" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0e7d70">one stream</text>
+    <text x="587" y="139" text-anchor="middle" font-size="10" fill="#0e7d70">no seams</text>
+
+    <text x="16" y="196" font-size="11.5" fill="#5b6573">Between <tspan font-family="ui-monospace, monospace" font-size="10.5">SpeechStarted</tspan> and <tspan font-family="ui-monospace, monospace" font-size="10.5">SpeechMetadata</tspan>, every frame of that turn arrives.</text>
+    <text x="16" y="220" font-size="11.5" fill="#5b6573">We never place a boundary, so there is no sentence splitter and nothing to stitch back up.</text>
+  </g>
+</svg>
