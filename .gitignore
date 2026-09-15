@@ -16,3 +16,6 @@ docs/superpowers/**/*.html
 # local live-API checks write here
 scripts/out/
 .venv/
+
+# deploy target config for scripts/deploy.sh and scripts/tail_ha_log.sh (host, token)
+scripts/.ha-deploy.env
