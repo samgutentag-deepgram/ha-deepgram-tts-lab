@@ -69,6 +69,12 @@ CONTENT_TYPE_EXTENSIONS: Final[dict[str, str]] = {
     "audio/l16": "pcm",
 }
 
+# Added in chapter 4 for config_flow.py.
+
+# How each family is written where a person reads it: the entry title and the voice picker.
+# Deepgram capitalizes both product names, and "aura" lower case in a title looks like a typo.
+FAMILY_LABELS: Final[dict[str, str]] = {FAMILY_FLUX: "Flux", FAMILY_AURA: "Aura"}
+
 # One word, synthesized and thrown away, to prove a key works during the config flow.
 VERIFY_KEY_TEXT: Final = "Hello"
 
