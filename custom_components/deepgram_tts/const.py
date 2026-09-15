@@ -44,3 +44,33 @@ TIMEOUT_CATALOG: Final = 15
 TIMEOUT_SPEAK: Final = 60
 TIMEOUT_WS_CONNECT: Final = 10
 TIMEOUT_WS_FRAME: Final = 30
+
+# Added in chapter 2 for api.py.
+
+# Both endpoints default to mp3 when no encoding is requested, so mp3 is also the fallback
+# extension when nothing in the response or the request says otherwise.
+ENCODING_MP3: Final = "mp3"
+DEFAULT_EXTENSION: Final = ENCODING_MP3
+
+# container=none means raw frames with no wrapper, so it is never a file extension.
+CONTAINER_NONE: Final = "none"
+
+# Response Content-Type to file extension. Deliberately short: an entry only belongs here when
+# the container the header names is unambiguous, because the fallback (requested container,
+# then requested encoding, then mp3) is always available and never wrong.
+CONTENT_TYPE_EXTENSIONS: Final[dict[str, str]] = {
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/flac": "flac",
+    "audio/aac": "aac",
+    "audio/basic": "mulaw",
+    "audio/l16": "pcm",
+}
+
+# One word, synthesized and thrown away, to prove a key works during the config flow.
+VERIFY_KEY_TEXT: Final = "Hello"
+
+# A non-JSON error body goes into the exception message, so it has to be bounded.
+ERROR_BODY_MAX_CHARS: Final = 200
