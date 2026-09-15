@@ -128,3 +128,64 @@ is canonical and not to be re-derived, and quietly fixing a template through one
 it is how two copies start to drift.
 Source: ~/.claude/plugins/marketplaces/project-workflow/skills/project-hub/template.html, the block after the "Board:" comment
 Routes to: a fix in the project-workflow plugin, not in this repo
+
+### [claim] The live catalogs match the handoff's numbers exactly, six weeks after they were recorded
+HANDOFF section 3.3 recorded 36 Flux voices from `/v2/models` and 102 Aura TTS entries from
+`/v1/models`, split 90 `aura-2` and 12 legacy `aura`, probed on 2026-09-15. Re-fetched live from
+a different session against the real API: 36 and 102, with the same 90/12 split.
+It held. Worth stating as a claim rather than an assumption, because the whole voice list is
+fetched at runtime and nothing in the code hardcodes a count. The numbers appearing in prose
+later are now checked twice against the live API rather than once.
+Source: `scripts/live_check.py` unauthenticated half · HANDOFF.md section 3.3
+Routes to: technical blog post, the voice catalog section
+
+### [surprise] aioclient_mock loses to a fixture that resolves too early
+Expected: an `aioclient_mock` fixture plus a client fixture to intercept every request. Actual:
+`'NoneType' object has no attribute 'getaddrinfo'`, which names nothing useful and looks like a
+DNS problem. Cause: `hass` caches the aiohttp session the first time anything asks for one, so a
+**synchronous** client fixture resolves before the mock patch is in place, gets a real session,
+and tries to hit the network for real.
+Fix: the client fixture has to be `async` and has to depend on `aioclient_mock` explicitly, so
+ordering is a declared dependency rather than luck. Also worth knowing: `mock_calls` records
+tuples of `(method, url, data, headers)` with the method upper-cased, so asserting on `"post"`
+silently never matches.
+This will bite every remaining chapter that builds a client or a catalog fetch in a fixture, so
+it is written down here rather than rediscovered three more times.
+Source: tests/test_api.py, the client fixture · chapter 2 agent report
+Routes to: a gotchas post about testing Home Assistant custom integrations
+
+### [decision] sample_rate is dropped only for an explicit encoding=mp3, not for the default
+The API rejects `sample_rate` when `encoding=mp3` as "not applicable". mp3 is also the default
+when no encoding is sent, so `sample_rate` with no encoding may hit the same rejection.
+What lost: widening the drop to cover the unset case, which would have been the defensive
+choice. What was chosen: follow the interface contract literally and drop it only on an explicit
+`encoding=mp3`. Reason: guessing at the default's behavior would bake an unverified assumption
+into the client, and one authenticated request settles it for real. HANDOFF section 3.4 muddies
+it further by recording `/v1/speak`'s documented defaults as mp3 **and** `sample_rate=24000`
+together, which cannot both be applicable if the rejection is real.
+Cost if wrong: one rejected request with a clear `err_code`, on a path nothing uses yet.
+This is now the top item on the list of things the first API key settles.
+Source: custom_components/deepgram_tts/api.py `_build_params` · docs/chapter-2-notes.md
+Routes to: chapter 2 live verification, and the open questions list
+
+### [decision] container=none falls through the extension chain instead of becoming the extension
+The contract's fallback chain for the file extension is content type, then container, then
+encoding, then mp3. Taken literally, `container=none` yields `extension="none"`, which is not a
+format and would confuse Home Assistant's converter. What was chosen: skip `none` and fall
+through to the encoding, because `none` means raw frames with no wrapper rather than a container
+called none. A deliberate deviation from the literal contract, recorded here because a later
+reader will otherwise see the code disagree with the spec and assume the code is wrong.
+Source: custom_components/deepgram_tts/api.py `_extension_for` · docs/superpowers/interface-contract.md
+Routes to: a contract revision, and chapter 6 where raw linear16 gets a WAV header
+
+### [decision] A local markdown renderer, because this machine has none
+HANDOFF section 8.4 records that there is no `markdown`, `mistune`, or `pandoc` on this machine,
+so rendering a spec to the print-ready HTML review copy needed a script that did not exist.
+Written as a stdlib-only renderer that copies the canonical template's style block, theme
+toggle, and script byte for byte and fills only the title and the content region.
+Left in the session scratchpad rather than committed here, on purpose: it is machine-level
+tooling for every repo that writes a spec, not part of this integration, and this repo flips to
+a public snapshot later. Its home is `~/Developer/gutils/templates/` next to the template it
+reads, which is a two minute move whenever that is wanted.
+Source: scratchpad `render_md.py` · docs/superpowers/interface-contract.html
+Routes to: a gutils commit, and the open questions list

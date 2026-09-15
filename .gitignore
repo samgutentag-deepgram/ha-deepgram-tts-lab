@@ -16,3 +16,6 @@ docs/superpowers/**/*.html
 # local live-API checks write here
 scripts/out/
 .venv/
+
+# agent worktrees. real git worktrees, never content
+.claude/worktrees/
