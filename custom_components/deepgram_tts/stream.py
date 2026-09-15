@@ -21,7 +21,7 @@ import struct
 import time
 from typing import Any
 
-from aiohttp import ClientError, ClientSession, WSMsgType
+from aiohttp import ClientError, ClientSession, WSMsgType, WSServerHandshakeError
 
 from .const import (
     TIMEOUT_WS_CONNECT,
@@ -41,6 +41,14 @@ _LOGGER = logging.getLogger(__name__)
 # when it sees this. A real length would mean buffering the whole clip, which is the one thing
 # streaming exists to avoid.
 _UNKNOWN_LENGTH = 0xFFFFFFFF
+
+_AUTH_STATUSES = frozenset({401, 403})
+
+# A turn is a spoken sentence or two. These exist so a server that never sends SpeechMetadata
+# cannot hold a generator open forever, which is a hang rather than an error and therefore does
+# not degrade to batch.
+MAX_FRAMES_PER_TURN = 20_000
+MAX_WARNINGS_PER_TURN = 20
 
 
 def wav_header(
@@ -166,8 +174,27 @@ class FluxSocket:
 
         except DeepgramAuthError, DeepgramConnectionError:
             raise
+        except WSServerHandshakeError as err:
+            # Ordered ahead of ClientError on purpose. A rejected key fails the HTTP upgrade,
+            # so it never produces an in-band Error frame and arrives here as a
+            # WSServerHandshakeError, which is a ClientError subclass. Left to the handler
+            # below it becomes a connection error, the caller falls back to batch, and an
+            # expired key reads as a flaky network. That is the exact defect in HANDOFF
+            # section 2.2 that this integration exists to not repeat.
+            if err.status in _AUTH_STATUSES:
+                raise DeepgramAuthError(
+                    f"Flux socket rejected the API key (HTTP {err.status}): {err.message}"
+                ) from err
+            raise DeepgramConnectionError(
+                f"Flux socket handshake failed (HTTP {err.status}): {err.message}"
+            ) from err
         except (ClientError, TimeoutError, OSError) as err:
             raise DeepgramConnectionError(f"Flux socket failed: {err}") from err
+        except (ValueError, TypeError, AttributeError) as err:
+            # A frame that is not JSON, or is JSON but not an object, or carries a field of the
+            # wrong type. Every one of these escaped as a raw exception before, which defeats
+            # the fallback: the caller catches DeepgramConnectionError, not TypeError.
+            raise DeepgramConnectionError(f"Flux socket sent an unreadable frame: {err}") from err
 
         self._check_sample_rate()
 
@@ -206,7 +233,14 @@ class FluxSocket:
 
     async def _receive(self, socket: Any, first_speak: float) -> AsyncGenerator[bytes]:
         """Yield binary frames until SpeechMetadata says the turn is complete."""
+        frames = 0
         while True:
+            frames += 1
+            if frames > MAX_FRAMES_PER_TURN:
+                raise DeepgramConnectionError(
+                    f"Flux socket sent more than {MAX_FRAMES_PER_TURN} frames without "
+                    "SpeechMetadata; ending the turn rather than hanging"
+                )
             message = await socket.receive(timeout=TIMEOUT_WS_FRAME)
 
             if message.type is WSMsgType.BINARY:
@@ -228,9 +262,7 @@ class FluxSocket:
                 if kind == "Error":
                     raise self._error_from(event)
                 if kind == "Warning":
-                    warning = f"{event.get('code')}: {event.get('description')}"
-                    self.metrics.warnings.append(warning)
-                    _LOGGER.warning("Flux socket warning, %s", warning)
+                    self._warn(f"{event.get('code')}: {event.get('description')}")
                 continue
 
             if message.type in (WSMsgType.CLOSED, WSMsgType.CLOSING, WSMsgType.ERROR):
@@ -267,25 +299,43 @@ class FluxSocket:
         wrong pitch, which sounds like a bad voice rather than like a bug, so it is worth one
         division to catch. Deliberately a warning: wrong-pitch audio still beats silence.
         """
-        if not self.metrics.audio_duration_ms or not self.metrics.audio_bytes:
+        duration = self.metrics.audio_duration_ms
+        if not isinstance(duration, int | float) or duration <= 0:
+            if self.metrics.audio_bytes:
+                self._warn(
+                    f"Received {self.metrics.audio_bytes} bytes of audio while SpeechMetadata "
+                    f"reported a duration of {duration!r}, so the sample rate could not be "
+                    "checked against the WAV header"
+                )
+            return
+        if not self.metrics.audio_bytes:
             return
 
         bytes_per_ms = self._sample_rate * WS_CHANNELS * WS_BITS_PER_SAMPLE / 8 / 1000
-        expected = self.metrics.audio_duration_ms * bytes_per_ms
+        expected = duration * bytes_per_ms
         if expected <= 0:
             return
 
         ratio = self.metrics.audio_bytes / expected
-        if not 0.9 <= ratio <= 1.1:
+        # Tight on purpose. The nearest wrong rate a server might plausibly send is 22050
+        # against a declared 24000, which is a ratio of 0.919, and a 0.9 window misses it.
+        if not 0.95 <= ratio <= 1.05:
             implied = round(self._sample_rate * ratio)
-            warning = (
-                f"Received {self.metrics.audio_bytes} bytes for "
-                f"{self.metrics.audio_duration_ms} ms of audio, which implies about {implied} Hz "
-                f"and not the {self._sample_rate} Hz in the WAV header. Playback pitch will be "
-                f"wrong by roughly {ratio:.2f}x"
+            self._warn(
+                f"Received {self.metrics.audio_bytes} bytes for {duration} ms of audio, which "
+                f"implies about {implied} Hz and not the {self._sample_rate} Hz in the WAV "
+                f"header. Playback pitch will be wrong by roughly {ratio:.2f}x"
             )
-            self.metrics.warnings.append(warning)
-            _LOGGER.warning(warning)
+
+    def _warn(self, message: str) -> None:
+        """Log a warning and keep a bounded copy on the metrics.
+
+        Bounded because a chatty server should not be able to grow this list without limit for
+        the lifetime of a turn.
+        """
+        _LOGGER.warning("Flux socket: %s", message)
+        if len(self.metrics.warnings) < MAX_WARNINGS_PER_TURN:
+            self.metrics.warnings.append(message)
 
     def _error_from(self, event: dict[str, Any]) -> DeepgramConnectionError | DeepgramAuthError:
         """Turn a server Error message into the right typed exception."""
