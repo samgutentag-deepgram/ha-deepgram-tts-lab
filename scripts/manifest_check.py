@@ -66,8 +66,15 @@ def check_manifest(manifest: dict) -> list[str]:
     missing = [key for key in REQUIRED_KEYS if key not in keys]
     if missing:
         errors.append(f"manifest.json missing keys: {', '.join(missing)}")
-    if keys != [key for key in REQUIRED_KEYS if key in keys]:
-        errors.append(f"manifest.json keys out of hassfest order: {keys}")
+
+    # Only the keys we require are order checked, and only against each other. Optional keys
+    # like `dependencies` and `after_dependencies` are legal and may appear anywhere, so
+    # comparing the whole key list against REQUIRED_KEYS reported a false ordering failure for
+    # a manifest that was correct.
+    present = [key for key in keys if key in REQUIRED_KEYS]
+    expected = [key for key in REQUIRED_KEYS if key in keys]
+    if present != expected:
+        errors.append(f"manifest.json required keys out of hassfest order: {present}")
     if manifest.get("single_config_entry"):
         errors.append("single_config_entry is set; two entries must stay possible")
     return errors

@@ -31,9 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
+      # manifest_check.py parses the integration with ast, and this code targets 3.14. ruff's
+      # own formatter emits `except A, B:` (PEP 758), which is a SyntaxError on anything older,
+      # so the runner's system python would crash the guard rather than run it.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
       - run: uvx ruff@0.16.7 check .
       - run: uvx ruff@0.16.7 format --check .
-      - run: python3 scripts/manifest_check.py
+      - run: python scripts/manifest_check.py
 
   test:
     name: pytest

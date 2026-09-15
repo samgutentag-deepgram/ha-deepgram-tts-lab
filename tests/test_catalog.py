@@ -20,7 +20,7 @@ from custom_components.deepgram_tts.const import (
     URL_MODELS_FLUX,
 )
 from custom_components.deepgram_tts.errors import DeepgramConnectionError
-from custom_components.deepgram_tts.models import VoiceCatalog
+from custom_components.deepgram_tts.models import VoiceCatalog, VoiceInfo
 
 
 async def _fetch(
@@ -272,4 +272,121 @@ async def test_server_error_raises_a_connection_error(
     aioclient_mock.get(URL_MODELS_AURA, status=503)
 
     with pytest.raises(DeepgramConnectionError):
+        await async_fetch_catalog(async_get_clientsession(hass))
+
+
+# --- what the skeptic pass found, and what would have caught it -------------------------
+
+
+def _catalog(*voices: VoiceInfo) -> VoiceCatalog:
+    return VoiceCatalog(voices={voice.voice_id: voice for voice in voices})
+
+
+MISLABELED_FLUX_ES = VoiceInfo(
+    voice_id="flux-rogue-es",
+    name="Rogue",
+    family=FAMILY_FLUX,
+    languages=("es", "es-MX"),
+)
+REAL_AURA_ES = VoiceInfo(
+    voice_id="aura-2-celeste-es",
+    name="Celeste",
+    family=FAMILY_AURA,
+    languages=("es", "es-CO"),
+)
+
+
+def test_a_mislabeled_flux_voice_is_refused_even_when_it_is_the_preference():
+    """The reproduced counterexample to a ledger claim, now a test.
+
+    The ledger said settled decision 4 "survives a catalog that is wrong about itself." It did
+    not. The last-resort branch was guarded on the language, but the preferred-voice branch was
+    guarded on neither the language nor the family, so it trusted the catalog completely and a
+    Flux entry claiming `es` came straight back for a Spanish pipeline.
+
+    Every Flux voice is English. A Flux entry claiming Spanish is a labeling error, not a
+    capability, so it has to be refused whoever asked for it.
+    """
+    catalog = _catalog(MISLABELED_FLUX_ES, REAL_AURA_ES)
+
+    voice = resolve_voice(catalog, "es", "flux-rogue-es")
+
+    assert voice is not None
+    assert voice.is_flux is False
+    assert voice.voice_id == "aura-2-celeste-es"
+
+
+def test_a_mislabeled_flux_voice_is_refused_even_as_the_only_candidate():
+    """Nothing beats no voice at all, when the alternative is the wrong language."""
+    catalog = _catalog(MISLABELED_FLUX_ES)
+
+    assert resolve_voice(catalog, "es", "flux-rogue-es") is None
+    assert resolve_voice(catalog, "es", None) is None
+
+
+@pytest.mark.parametrize("language", ["es", "de", "fr", "nl", "it", "ja"])
+def test_the_family_guard_is_load_bearing_for_every_language(language: str):
+    """Chapter 3's six-language test passed with the family guard deleted.
+
+    Its fixture gave each language exactly one voice, and that voice was Aura, so "first
+    non-Flux candidate" and "first candidate" were the same object and the guard could be
+    removed without anything failing. Here each language has a Flux voice that sorts first, so
+    deleting the guard returns Flux and the test fails.
+    """
+    rogue = VoiceInfo(
+        voice_id=f"flux-rogue-{language}",
+        name="Aaa Rogue",  # sorts first within its family, and Flux sorts before Aura
+        family=FAMILY_FLUX,
+        languages=(language,),
+    )
+    real = VoiceInfo(
+        voice_id=f"aura-2-real-{language}",
+        name="Zzz Real",
+        family=FAMILY_AURA,
+        languages=(language,),
+    )
+    catalog = _catalog(rogue, real)
+
+    assert voices_for_language(catalog, language)[0].is_flux is True
+
+    voice = resolve_voice(catalog, language, None)
+
+    assert voice is not None
+    assert voice.is_flux is False
+    assert voice.voice_id == f"aura-2-real-{language}"
+
+
+def test_a_flux_voice_is_still_allowed_for_english():
+    """The guard is on the language, not a blanket refusal. English is what Flux is for."""
+    haley = VoiceInfo(
+        voice_id=DEFAULT_VOICE, name="Haley", family=FAMILY_FLUX, languages=("en", "en-US")
+    )
+    catalog = _catalog(haley)
+
+    voice = resolve_voice(catalog, "en-GB", DEFAULT_VOICE)
+
+    assert voice is not None
+    assert voice.voice_id == DEFAULT_VOICE
+
+
+async def test_a_body_that_is_not_json_retries_instead_of_failing_the_entry(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    flux_models_payload: dict,
+) -> None:
+    """A 200 carrying an error page used to escape as ValueError, which means no retry.
+
+    aiohttp raises ContentTypeError, a ClientError, when the content type is wrong. A JSON
+    content type with a malformed body raises ValueError instead, and that escaped
+    async_setup_entry as a raw exception and put the entry in SETUP_ERROR. A proxy serving an
+    error page is transient, so the entry has to retry.
+    """
+    aioclient_mock.get(URL_MODELS_FLUX, json=flux_models_payload)
+    aioclient_mock.get(
+        URL_MODELS_AURA,
+        text="<html>502 Bad Gateway</html>",
+        headers={"Content-Type": "application/json"},
+    )
+
+    with pytest.raises(DeepgramConnectionError, match="not JSON"):
         await async_fetch_catalog(async_get_clientsession(hass))

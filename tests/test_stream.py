@@ -347,3 +347,183 @@ async def test_matching_sample_rate_records_no_warning():
     await collect(socket, "hi.")
 
     assert socket.metrics.warnings == []
+
+
+# --- what the skeptic pass found, and what would have caught it -------------------------
+
+
+class HandshakeFailSession(FakeSession):
+    """Fails the HTTP upgrade, which is how a rejected key actually arrives."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__()
+        self.status = status
+
+    def ws_connect(self, url, **kwargs):
+        from aiohttp import WSServerHandshakeError
+
+        status = self.status
+
+        class Ctx:
+            async def __aenter__(self):
+                raise WSServerHandshakeError(
+                    SimpleNamespace(real_url=url),
+                    (),
+                    status=status,
+                    message="Invalid credentials.",
+                )
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return Ctx()
+
+
+@pytest.mark.parametrize("status", [401, 403])
+async def test_a_rejected_key_on_the_handshake_is_an_auth_error(status: int):
+    """The defect this whole integration exists to not repeat, on the primary path.
+
+    A rejected key fails the HTTP upgrade, so it never produces an in-band Error frame. It
+    arrives as WSServerHandshakeError, which is a ClientError subclass, and a handler that only
+    catches ClientError turns an expired key into a connection error. The caller then falls back
+    to batch and the real cause is hidden twice over.
+    """
+    socket = FluxSocket(HandshakeFailSession(status), "expired", model=DEFAULT_VOICE)
+
+    with pytest.raises(DeepgramAuthError, match="rejected the API key"):
+        await collect(socket, "hi.")
+
+
+async def test_a_non_auth_handshake_failure_is_still_a_connection_error():
+    socket = FluxSocket(HandshakeFailSession(503), "key", model=DEFAULT_VOICE)
+
+    with pytest.raises(DeepgramConnectionError, match="handshake failed"):
+        await collect(socket, "hi.")
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        SimpleNamespace(type=WSMsgType.TEXT, data="not json at all"),
+        SimpleNamespace(type=WSMsgType.TEXT, data="[1, 2, 3]"),
+    ],
+    ids=["not-json", "json-but-not-an-object"],
+)
+async def test_an_unreadable_frame_degrades_instead_of_escaping(frame):
+    """Three ways a frame can be wrong, and all three escaped as raw exceptions before.
+
+    It matters because the caller catches DeepgramConnectionError to fall back to batch. A
+    JSONDecodeError, an AttributeError, or a TypeError sails straight past that handler and
+    reaches a person who asked their house a question.
+    """
+    session = FakeSession()
+    session.socket.outbox.append(frame)
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+
+    with pytest.raises(DeepgramConnectionError):
+        await collect(socket, "hi.")
+
+
+async def test_a_metadata_field_of_the_wrong_type_warns_rather_than_raising():
+    """The third way a frame can be wrong, and the only one where raising would be worse.
+
+    `audio_duration_ms` arrives after every audio frame has already been handed to the caller,
+    so failing the turn at that point throws away audio that was fine. It warns instead, which
+    is also why it is not in the parametrize above.
+    """
+    session = FakeSession()
+    session.socket.outbox.append(
+        SimpleNamespace(
+            type=WSMsgType.TEXT,
+            data=json.dumps({"type": "SpeechMetadata", "audio_duration_ms": "twenty"}),
+        )
+    )
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+
+    await collect(socket, "hi.")
+
+    assert socket.metrics.warnings == [] or "could not be checked" in socket.metrics.warnings[0]
+
+
+async def test_the_sender_task_is_never_left_running():
+    """The cleanup had a ledger entry behind it and no test, and deleting it stayed green."""
+    import asyncio
+
+    before = {id(task) for task in asyncio.all_tasks()}
+    session = FakeSession(socket=FakeSocket(frames_per_speak=1, close_after_frames=1))
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+
+    with pytest.raises(DeepgramConnectionError):
+        await collect(socket, "one ", "two ", "three ", "four ", "five.")
+
+    leaked = [task for task in asyncio.all_tasks() if id(task) not in before and not task.done()]
+    assert leaked == [], f"sender task left running: {leaked}"
+
+
+async def test_a_22050_hz_stream_against_a_24000_hz_header_is_caught():
+    """The nearest plausible wrong rate, which the original 0.9 tolerance window missed.
+
+    22050 against a declared 24000 is a ratio of 0.919, comfortably inside a 0.9 to 1.1 window
+    and still audibly wrong. 11 frames of 480 bytes is 5280 bytes; a reported 120 ms expects
+    5760, which is a ratio of 0.917 and lands in exactly that blind spot.
+    """
+    session = FakeSession(socket=FakeSocket(frames_per_speak=11, audio_duration_ms=120))
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+
+    await collect(socket, "hi.")
+
+    assert socket.metrics.warnings
+    assert "Hz" in socket.metrics.warnings[0]
+
+
+async def test_a_zero_duration_with_real_audio_is_reported_not_skipped():
+    """Dividing by it would raise, so the old code returned early and said nothing at all."""
+    session = FakeSession(socket=FakeSocket(frames_per_speak=2, audio_duration_ms=0))
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+
+    await collect(socket, "hi.")
+
+    assert socket.metrics.warnings
+    assert "could not be checked" in socket.metrics.warnings[0]
+
+
+async def test_warnings_are_bounded():
+    """A chatty server must not grow this list for the lifetime of a turn."""
+    from custom_components.deepgram_tts.stream import MAX_WARNINGS_PER_TURN
+
+    session = FakeSession()
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+    for index in range(MAX_WARNINGS_PER_TURN + 25):
+        socket._warn(f"warning {index}")
+
+    assert len(socket.metrics.warnings) == MAX_WARNINGS_PER_TURN
+
+
+async def test_a_turn_that_never_ends_is_bounded_rather_than_hanging():
+    """A server that never sends SpeechMetadata is a hang, and a hang does not degrade."""
+    from custom_components.deepgram_tts import stream as stream_module
+
+    class Endless(FakeSocket):
+        """Connects, then sends audio forever and never sends SpeechMetadata."""
+
+        async def send_json(self, payload: dict) -> None:
+            # Deliberately answers nothing, not even Flush. The base class would append
+            # SpeechMetadata and end the turn, which is the opposite of what is under test.
+            self.sent.append(payload)
+            await _yield()
+
+        async def receive(self, timeout=None):
+            await _yield()
+            if self.outbox:
+                return self.outbox.popleft()
+            return binary(FRAME)
+
+    session = FakeSession(socket=Endless())
+    socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
+    original = stream_module.MAX_FRAMES_PER_TURN
+    stream_module.MAX_FRAMES_PER_TURN = 50
+    try:
+        with pytest.raises(DeepgramConnectionError, match="without SpeechMetadata"):
+            await collect(socket, "hi.")
+    finally:
+        stream_module.MAX_FRAMES_PER_TURN = original

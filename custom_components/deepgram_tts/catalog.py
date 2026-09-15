@@ -43,6 +43,14 @@ async def async_fetch_catalog(session: ClientSession) -> VoiceCatalog:
             f"Could not read the Deepgram voice catalogs at {URL_MODELS_FLUX} "
             f"and {URL_MODELS_AURA}: {err}"
         ) from err
+    except ValueError as err:
+        # A 200 whose body is not JSON. aiohttp raises ContentTypeError, a ClientError, for a
+        # wrong content type, but a JSON content type with a malformed body raises ValueError
+        # and escaped as SETUP_ERROR, which means the entry fails with no retry. A proxy
+        # serving an error page is transient, so it has to be ConfigEntryNotReady.
+        raise DeepgramConnectionError(
+            f"A Deepgram voice catalog returned a body that is not JSON: {err}"
+        ) from err
 
     voices: dict[str, VoiceInfo] = {}
     # Flux first, so a collision resolves in its favor and the dict reads Flux before Aura.
@@ -103,6 +111,16 @@ def resolve_voice(catalog: VoiceCatalog, language: str, preferred: str | None) -
             _LOGGER.warning("Preferred voice %s is not in the catalog", preferred)
         elif base not in voice.base_languages:
             _LOGGER.debug("Preferred voice %s cannot speak %s", preferred, language)
+        elif voice.is_flux and base != DEFAULT_LANGUAGE:
+            # Guarded on the family as well as the language, because the language check trusts
+            # the catalog and the catalog can be wrong about itself. Every Flux voice is
+            # English, so a Flux entry claiming es is a labeling error rather than a capability,
+            # and honoring it would hand a Spanish pipeline a voice that speaks English.
+            _LOGGER.warning(
+                "Preferred voice %s claims %s, but every Flux voice is English; ignoring it",
+                preferred,
+                language,
+            )
         else:
             return voice
 

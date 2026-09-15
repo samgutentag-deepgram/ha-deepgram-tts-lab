@@ -516,3 +516,120 @@ Every voice id on the page was confirmed present in the live catalogs. The two t
 use illustrative spacing, stated on the page, because no latency has been measured.
 Source: docs/eli5-ha-flux-tts.html · docs/assets/
 Routes to: both blog posts, video B-roll, the hub
+
+### [claim] The trap fired in our own test suite, which is better evidence than the audit
+Adding `async_stream_tts_audio` on the chapter 6 branch broke **15 tests that had nothing to do
+with streaming.** Thirteen of them drove `async_get_media_source_audio`, which is how Home
+Assistant itself synthesizes, so the moment the method existed the manager routed all of them
+down the websocket. They were written as batch tests and had silently become fallback tests.
+That is HANDOFF section 2.1 reproduced exactly, in this project, by us, two hours after writing
+it down as a thing to avoid. In a test suite it shows up as 15 red tests. In a house it shows up
+as a voice assistant that stops working while `tts.speak` keeps passing, which is why the
+community integration looked healthy to anyone who tested it by hand.
+It held, and it is stronger evidence than the audit was. The audit said "this can happen to
+you." This says "it happened to us, with the warning open in another window."
+Fix: the batch tests call `async_get_tts_audio` by name. Chapter 5's guard assertion was
+**inverted rather than deleted**, because the fact it pins has not changed: if that method is
+ever removed or renamed, streaming turns off silently and every pipeline reverts to batch with
+nothing failing.
+Source: tests/test_tts.py header · docs/chapter-6-notes.md · commit 254f310 on chapter-6-streaming
+Routes to: technical blog post, and it is now the strongest section in it
+
+### [decision] Two failure windows, and only one of them can fall back
+Settled decision 5 says a dropped socket degrades to batch rather than erroring. Building it
+turned up that this is only true before anything has been yielded, and the handoff does not
+distinguish the cases.
+Before the first audio frame reaches the caller: serve the whole turn from `/v2/speak`. A
+listener hears no difference.
+After: a batch clip cannot be appended. It arrives with its own 44 byte RIFF header, which lands
+in the middle of the stream and decodes as the first half followed by garbage. So the turn ends
+where it ends and the log says why. **Truncated speech is bad; a second WAV header mid-stream is
+worse**, because it fails in a way nobody can diagnose by listening.
+To keep the safe window as wide as possible the entity **holds the socket's WAV header** until
+the first real audio frame arrives. A header already sent is what makes a clean fallback
+impossible, so 44 bytes of delay buys the entire fallback window.
+Confirmed independently from the other direction: `TTSCache.async_load_data` drains the generator
+once in a background task and `async_stream_data` yields every already-buffered chunk before
+re-raising, so a mid-turn fallback is exactly the concatenation described above. Two
+investigations, one reasoning about RIFF headers and one reading HA's cache, same hazard.
+Source: custom_components/deepgram_tts/tts.py `_socket_stream` · docs/handoff-corrections.md C6
+Routes to: technical blog post, chapter 6 section
+
+### [claim] The unknown-length WAV header is readable, and real ffmpeg proves it
+`stream.py` writes `0xFFFFFFFF` into both RIFF size fields because a stream cannot know its own
+length. Nothing downstream had ever been asked whether that is acceptable.
+It is. Two independent checks. `test_the_streaming_wav_survives_home_assistants_own_ffmpeg_pass`
+asks the tts manager for mp3 while the entity produces wav, which forces `_async_convert_audio`
+to shell out to the real ffmpeg on this machine, and it converts cleanly. Separately, HA's exact
+command line was replayed over a non-seekable pipe against all five variants of the size fields,
+including wyoming's zeros: byte-identical output, nothing truncated, and conversion is
+progressive rather than buffered to end of stream.
+Better than expected: `_async_convert_audio` carries a special case that exists for precisely
+this, `-probesize 32` when the input is a generator and the extension is wav, with a comment
+saying it is to minimize probing latency for live TTS audio.
+Still open, and it is a hardware question: whether a **playback device** is as tolerant as
+ffmpeg. The hardware research found a HEAD handler in core whose comment says it exists for
+Samsung DLNA renderers, which is a map of which devices break on a stream with no
+Content-Length.
+Source: tests/test_tts_streaming.py · docs/ha-2026.9-verification.md · docs/handoff-corrections.md C5
+Routes to: technical blog post, the real-hardware checklist
+
+### [surprise] Streamed audio is never cached, and the socket opens whether or not anyone listens
+Two facts from reading HA's TTS cache that nobody would guess and that change what this costs.
+The generator drain starts the moment Home Assistant creates the result stream, not when a
+player fetches it. So the socket opens and Deepgram bills the characters even if nothing ever
+plays the audio.
+And streamed audio is never cached or deduplicated: `store_to_disk=False`, keyed on a ULID.
+Batch audio **is** cached. So switching a house from batch to streaming turns every repeated
+question into a fresh billed request. At $0.045 per 1,000 characters that is a real difference
+for a household that asks the same thing every morning.
+Related and load-bearing for the measurement: `tts.speak` defaults to `cache: true`, which makes
+the cache the single biggest threat to the first-frame number. A second call measures the cache,
+not the API. Every measurement passes `cache: false`.
+Source: docs/ha-2026.9-verification.md · docs/hardware-notes.md
+Routes to: technical blog post, the cost section, and the measurement protocol
+
+### [claim] Returning WAV is correct but not free, and the handoff says free
+HANDOFF section 4.3: "returning WAV and letting HA transcode is correct and free."
+Correct, yes, and it is the core-normal choice: two of the three core integrations that stream
+also return wav, and the reference implementation for our shape is `wyoming` rather than
+`elevenlabs`. Free, no. `final_extension` falls back to `_DEFAULT_FORMAT`, which is mp3, so
+ffmpeg runs on essentially every call, and Assist forces it unconditionally by setting a
+preferred sample rate alongside the format.
+Did not hold. **Any latency budget taken from the handoff is short by one ffmpeg subprocess
+spawn per turn**, which on a Raspberry Pi is not nothing. It has to be inside the first-frame
+measurement rather than discovered after it.
+The design does not change, because transcoding ourselves is still worse. Only the arithmetic
+does.
+Source: docs/handoff-corrections.md C5 · installed tts/__init__.py:1068-1070 and 1151-1157
+Routes to: technical blog post, and the measurement protocol
+
+### [decision] Correction to two earlier entries in this file
+Append-only means corrections are new entries, so here are two.
+**On stream.py's location.** The chapter 6 entry above says the socket client "is built fully,
+on its own branch." It is not: `stream.py` landed on `main` as commit `dc0ac84`, inert, and only
+the entity override lives on the `chapter-6-streaming` branch. The hold itself is intact and for
+the stated reason, because the override is the only opt-in, and putting the engine on main was
+deliberate: it makes chapter 6 a small reviewable diff that only wires it up, which is the right
+size for the one change in this project that goes live the moment it exists.
+**On test counts.** The entry claiming "62 tests" was true when written and is now stale. Main is
+at 99. The `chapter-6-streaming` branch is at 108. Any number quoted in content should be read
+off the suite at the time of writing, not out of this file.
+Source: `git log --oneline` · `.venv/bin/pytest -q`
+Routes to: nothing outside this file, but it is why a ledger needs a correction rule
+
+### [asset] The hardware bill of materials, which was the gap nobody had researched
+`docs/hardware-bom.html`, print-ready, three tiers priced and dated 2026-09-15, plus
+`docs/hardware-notes.md` with every fact weighted source, weak, or inferred.
+Bench $12.50. One room hands free $58.95, a single Voice Preview Edition, one line item because
+padding it would have been dishonest. Two rooms on camera $163.14.
+The finding that changed the recommendation: **`rhasspy/wyoming-satellite` is archived and read
+only**, last push 2026-01-24, 212 open issues abandoned, and every "build a Pi voice satellite"
+tutorial on the internet still points at it. Its replacement speaks the ESPHome protocol rather
+than Wyoming and calls itself experimental. That deleted the Raspberry Pi tier outright.
+The finding that vindicated a settled decision nobody had a hardware reason for: an ESPHome
+satellite advertising the speaker flag **hard-refuses anything that is not WAV**, with "Only WAV
+audio can be streamed." Settled decision 6 was right for a reason that was not known when it was
+settled.
+Source: docs/hardware-bom.html · docs/hardware-notes.md
+Routes to: the buy list, user-facing blog post, video B-roll planning

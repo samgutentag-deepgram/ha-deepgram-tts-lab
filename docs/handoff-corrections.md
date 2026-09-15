@@ -169,3 +169,85 @@ manifest, so the test environment matches a real instance rather than approximat
 Neither belongs in our `manifest.json`. They are the `tts` component's requirements, and
 declaring somebody else's dependency is how a manifest starts lying, which is the failure mode
 section 2.1 is about.
+
+---
+
+## C5. Returning WAV is correct but not free. Section 4.3 is right about the first half.
+
+**Established 2026-09-15.** Corrects section 4.3.
+
+**What the handoff says:**
+
+> So returning WAV and letting HA transcode is correct and free. Doing our own transcode is waste.
+
+**What is actually true.** Correct, yes. Free, no. `final_extension` falls back to
+`_DEFAULT_FORMAT`, which is `"mp3"`, when no format was requested, and `needs_conversion` then
+compares that against the entity's `"wav"`. So **ffmpeg runs on essentially every call.** Assist
+makes it unconditional regardless: the pipeline sets a preferred sample rate alongside the
+format, and a non-null rate forces conversion on its own.
+
+Read from the installed `homeassistant/components/tts/__init__.py` at lines 1068-1070 and
+1151-1157, and `assist_pipeline/pipeline.py` at 1425-1431.
+
+**What this changes.** Not the design decision. Transcoding ourselves is still worse, and two of
+the three core integrations that stream also return WAV, so this is the core-normal choice.
+What changes is the arithmetic: **any latency budget written from the handoff is short by one
+ffmpeg subprocess spawn per turn.** On a Raspberry Pi that is not nothing, and it has to be in
+the first-frame measurement rather than discovered after it.
+
+Also confirmed in the same pass, and this is good news for `stream.py`: `_async_convert_audio`
+passes the entity's extension as ffmpeg's `-f`, and it carries a special case whose only purpose
+is our exact situation:
+
+```python
+if is_input_gen and from_extension == "wav":
+    # The container is known, so minimize probing latency for live TTS audio.
+    command.extend(["-probesize", "32"])
+```
+
+All five variants of the RIFF size fields, including our all-ones sentinel and wyoming's zeros,
+produce byte-identical ffmpeg output over a non-seekable pipe. Nothing truncates, conversion is
+progressive rather than buffered to end of stream, and a header split across two writes still
+works. One hard limit: raw PCM declared as `extension="wav"` with no header at all fails with
+`invalid start code in RIFF header`.
+
+---
+
+## C6. A mid-turn fallback is not safe, and the handoff's degradation advice needs a qualifier.
+
+**Established 2026-09-15.** Qualifies settled decision 5 and section 6.1.
+
+**What the handoff says.** Settled decision 5: "Fall back to `/v2/speak` batch when the socket
+fails or when the selected voice is Aura, so a dropped connection degrades instead of erroring."
+Section 6.1 makes it chapter 6's second verification: "killing the socket mid-turn degrades to
+batch instead of raising."
+
+**What is actually true.** It depends entirely on whether anything has been yielded yet, and the
+handoff does not distinguish the two cases.
+
+`TTSCache.async_load_data` drains the entity's generator once, in a background task, and
+multicasts the result. `async_stream_data` yields every **already-buffered** chunk before it
+re-raises a failure. So a generator that emits audio, fails, and then yields a batch result
+hands the consumer a truncated WAV stream immediately followed by a second complete audio file.
+That decodes as the first half followed by garbage.
+
+Read from the installed `tts/__init__.py` at lines 160-183 and 207-211.
+
+**What this changes.** Nothing in the code, because chapter 6 was built with two failure windows
+from the start and already sits on the safe side of this. Before any audio has reached the
+caller, the whole turn is served from batch. After, the turn ends early and the log says why.
+The entity also holds the socket's WAV header until the first real audio frame, specifically to
+keep the safe window as wide as possible.
+
+Recorded because the handoff's wording would lead a reader straight into the unsafe version, and
+because two independent investigations arrived at the same hazard from opposite directions: one
+by reasoning about RIFF headers while writing the fallback, one by reading HA's cache
+implementation.
+
+**Two more facts from the same reading, both worth knowing before anyone quotes a cost.**
+
+The drain starts the moment Home Assistant creates the result stream, not when a player fetches
+it. So the socket opens and characters are billed even if nobody ever listens. And streamed
+audio is never cached or deduplicated: `store_to_disk=False`, keyed on a ULID. Batch audio is
+cached; streamed audio is not. At $0.045 per 1,000 characters that is a real difference in a
+house that asks the same question every morning.
