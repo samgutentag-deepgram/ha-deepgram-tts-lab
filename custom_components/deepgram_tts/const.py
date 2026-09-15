@@ -74,3 +74,23 @@ VERIFY_KEY_TEXT: Final = "Hello"
 
 # A non-JSON error body goes into the exception message, so it has to be bounded.
 ERROR_BODY_MAX_CHARS: Final = 200
+
+# Added in chapter 5 for tts.py.
+
+# Home Assistant's preferred_format is one string, a file extension. Deepgram splits the same
+# idea across `encoding` and `container`, so the entity translates rather than forwarding.
+# Anything missing from this map asks for nothing and lets HA convert from the API default:
+# /v2/speak rejects an unrecognized encoding outright with INVALID_QUERY_PARAMETER, so a guess
+# costs a failed synthesis while a fallback costs one ffmpeg pass.
+PREFERRED_FORMAT_PARAMS: Final[dict[str, tuple[str, str | None]]] = {
+    "mp3": ("mp3", None),
+    "wav": ("linear16", "wav"),
+    "ogg": ("opus", "ogg"),
+    "flac": ("flac", None),
+    "aac": ("aac", None),
+}
+
+# Shown as the device model, so it reads as the voice family rather than a model id.
+DEVICE_MODEL_FLUX: Final = "Flux TTS"
+DEVICE_MODEL_AURA: Final = "Aura-2 TTS"
+MANUFACTURER: Final = "Deepgram"
