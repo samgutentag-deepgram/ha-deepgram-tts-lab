@@ -40,6 +40,14 @@ SPEED_MIN: Final = 0.5
 SPEED_MAX: Final = 1.5
 SPEED_STEP: Final = 0.05
 
+# The socket emits raw linear16 with no container, so we ask for a rate we know rather than
+# inferring one. The WAV header we prepend is wrong if this and the stream disagree, and wrong
+# by a factor of two sounds like a chipmunk rather than like an error.
+WS_ENCODING: Final = "linear16"
+WS_SAMPLE_RATE: Final = 24000
+WS_CHANNELS: Final = 1
+WS_BITS_PER_SAMPLE: Final = 16
+
 TIMEOUT_CATALOG: Final = 15
 TIMEOUT_SPEAK: Final = 60
 TIMEOUT_WS_CONNECT: Final = 10
