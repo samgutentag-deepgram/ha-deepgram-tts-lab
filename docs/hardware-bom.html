@@ -153,6 +153,10 @@
   table.bom .stk { display: block; font-size: 0.78rem; color: var(--faint); font-family: system-ui, sans-serif; }
   table.bom tr.total td { font-family: system-ui, sans-serif; font-weight: 600; }
   ol li, ul li { margin-bottom: 0.35rem; }
+  .watch { border: 2px solid var(--watch-border); background: var(--watch-bg);
+    border-radius: 6px; padding: 0.9rem 1.1rem; margin: 1.6rem 0; page-break-inside: avoid; }
+  .watch h3 { margin-top: 0; }
+  .watch ul { margin-bottom: 0.4rem; }
 </style>
 </head>
 <body>
@@ -185,6 +189,47 @@ boxes, the <em>Web browser</em> player in Home Assistant's Media panel will play
 laptop for zero dollars, tonight, and that is enough to finish chapters 2 through 5.</p>
 
 <p>The rest of this document is why, and what the alternatives cost you.</p>
+
+<div class="watch">
+<h3>Correction, 2026-09-16: you already own a speaker, and it changes the buy list</h3>
+
+<p>Section 3 dismisses "an existing smart speaker as output only" with the words <em>you own
+none, so this is a purchase, not a shortcut</em>. That premise was wrong. There is a
+<strong>Sonos Beam (model S14) at 192.168.1.138</strong>, confirmed by SSDP discovery and its own
+device description on 2026-09-16.</p>
+
+<p><strong>So the first thing to do is buy nothing.</strong> Home Assistant's Sonos integration
+is first party, <code>config_flow: true</code>, <code>iot_class: local_push</code>, and it
+discovers exactly the SSDP service type the Beam answered on
+(<code>urn:schemas-upnp-org:device:ZonePlayer:1</code>). It needs no Sonos account and makes no
+cloud calls: <code>soco</code> and <code>sonos-websocket</code>, both local. Add the integration,
+get a <code>media_player.sonos_beam</code>, point <code>tts.speak</code> at it, and Flux comes
+out of the soundbar for zero dollars.</p>
+
+<p>What that does and does not buy you:</p>
+
+<ul>
+<li><strong>The batch path will work.</strong> The Beam fetches the TTS proxy URL over plain
+HTTP on the LAN, and the proxy needs no auth.</li>
+<li><strong>The streaming path is the open question, and it is the same one section 2 already
+identified.</strong> The proxy is a chunked <code>StreamResponse</code> with no
+<code>Content-Length</code>, and Home Assistant carries a HEAD handler on that view whose comment
+says it exists for DLNA renderers that ask for the size first. A Sonos is precisely that class of
+device. It may stream, it may buffer the whole clip and quietly delete the benefit, or it may
+refuse. Nobody has tested it.</li>
+<li><strong>It is output only.</strong> The Beam has microphones, and they belong to Sonos Voice,
+not to Home Assistant. No wake word, no Assist input.</li>
+<li><strong>Do not measure latency through it.</strong> Section 3's objection still stands: it
+drops a buffering black box into the one number this project cares about. Measure on the host or
+the browser player, demo on the Beam.</li>
+</ul>
+
+<p><strong>Revised recommendation.</strong> Use the Beam now, and buy a Voice Preview Edition only
+when you want to <em>talk</em> to it rather than listen to it. That defers the entire $163.14
+until there is a reason for it, and the reason is the microphone, not the speaker. If the Sonos
+streaming test comes back badly, a $12.50 USB speaker on the Home Assistant host is the fallback
+for chapter 6 work, not a Voice PE.</p>
+</div>
 
 <h2>2. How audio actually leaves the integration</h2>
 

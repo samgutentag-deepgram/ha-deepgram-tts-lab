@@ -924,3 +924,22 @@ sending and receiving instead of serializing them, which is the property the fil
 What it does not prove is now written down in it.
 Source: tests/test_stream.py · docs/handoff-corrections.md C10
 Routes to: technical blog post, the testing section
+
+### [correction] The bill of materials rested on a premise that was false: he owns a Sonos
+`docs/hardware-bom.html` dismisses "an existing smart speaker as output only" with **"You own
+none, so this is a purchase, not a shortcut"**, and recommends $163.14 of hardware on that basis.
+Sam has a **Sonos Beam, model S14, at 192.168.1.138**, found by SSDP discovery and confirmed from
+its own device description. The research was careful and the premise came from the brief, which
+is the more useful lesson: a bill of materials inherits every assumption in the question it was
+asked, and "what do you already own" is the one nobody thinks to check.
+What changes: Home Assistant's Sonos integration is first party, local push, no account and no
+cloud calls, and it discovers exactly the SSDP service type the Beam answered on. So the batch
+path costs zero dollars and the $163.14 defers until there is a reason for it. **The reason is
+the microphone, not the speaker**, which is a cleaner way to decide than a tier table.
+What does not change: section 2's warning about the TTS proxy being a chunked response with no
+`Content-Length`, and the HEAD handler in core that exists for DLNA renderers wanting a size
+first. A Sonos is exactly that class of device, so **chapter 6 through the Beam is untested and
+may buffer the whole clip**. And the objection to measuring latency through a smart speaker
+stands: measure on the host, demo on the Beam.
+Source: SSDP `urn:schemas-upnp-org:device:ZonePlayer:1` probe · http://192.168.1.138:1400/xml/device_description.xml · docs/hardware-bom.html correction block
+Routes to: the buy decision, and the user-facing blog post, where "use the speakers you already own" is a better opening than a shopping list
