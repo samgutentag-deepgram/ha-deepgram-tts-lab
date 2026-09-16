@@ -1,0 +1,93 @@
+{
+  "measured_at": "2026-09-15T19:08:36-0700",
+  "hardware": "MacBook arm64, wifi",
+  "voice": "flux-haley-en",
+  "note": "Driven through the real DeepgramClient and FluxSocket, not a standalone socket.",
+  "header_sample_rate": 24000,
+  "runs": [
+    {
+      "connect_ms": 139.9,
+      "first_frame_ms": 307.5,
+      "metadata_ms": 3985.8,
+      "wall_ms": 4151.8,
+      "audio_duration_ms": 6240,
+      "audio_bytes": 299520,
+      "total_bytes": 299564,
+      "chunks_sent": 5,
+      "realtime_factor": 1.57,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-00.wav"
+    },
+    {
+      "connect_ms": 86.4,
+      "first_frame_ms": 324.8,
+      "metadata_ms": 3910.4,
+      "wall_ms": 4021.0,
+      "audio_duration_ms": 6080,
+      "audio_bytes": 291840,
+      "total_bytes": 291884,
+      "chunks_sent": 5,
+      "realtime_factor": 1.55,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-01.wav"
+    },
+    {
+      "connect_ms": 95.3,
+      "first_frame_ms": 306.1,
+      "metadata_ms": 3942.7,
+      "wall_ms": 4062.0,
+      "audio_duration_ms": 6160,
+      "audio_bytes": 295680,
+      "total_bytes": 295724,
+      "chunks_sent": 5,
+      "realtime_factor": 1.56,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-02.wav"
+    },
+    {
+      "connect_ms": 145.9,
+      "first_frame_ms": 320.2,
+      "metadata_ms": 3858.2,
+      "wall_ms": 4036.6,
+      "audio_duration_ms": 6000,
+      "audio_bytes": 288000,
+      "total_bytes": 288044,
+      "chunks_sent": 5,
+      "realtime_factor": 1.56,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-03.wav"
+    },
+    {
+      "connect_ms": 90.0,
+      "first_frame_ms": 306.6,
+      "metadata_ms": 3561.5,
+      "wall_ms": 3678.2,
+      "audio_duration_ms": 5520,
+      "audio_bytes": 264960,
+      "total_bytes": 265004,
+      "chunks_sent": 5,
+      "realtime_factor": 1.55,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-04.wav"
+    },
+    {
+      "connect_ms": 96.6,
+      "first_frame_ms": 327.3,
+      "metadata_ms": 4159.6,
+      "wall_ms": 4280.0,
+      "audio_duration_ms": 6480,
+      "audio_bytes": 311040,
+      "total_bytes": 311084,
+      "chunks_sent": 5,
+      "realtime_factor": 1.56,
+      "implied_sample_rate": 24000,
+      "warnings": [],
+      "file": "/Users/samgutentag/LABS/ha-deepgram-tts-lab/scripts/out/stream-05.wav"
+    }
+  ]
+}

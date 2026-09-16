@@ -1,0 +1,15 @@
+[deepgram_tts.tts] Synthesizing 47 chars as flux-haley-en (flux) for language en, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak es
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-agustina-es (aura) for language es, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak de
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-aurelia-de (aura) for language de, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak fr
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-agathe-fr (aura) for language fr, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak it
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-cesare-it (aura) for language it, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak ja
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-ama-ja (aura) for language ja, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak nl
+[deepgram_tts.tts] Synthesizing 47 chars as aura-2-beatrix-nl (aura) for language nl, speed=None, format=default
+[deepgram_tts.catalog] Preferred voice flux-haley-en cannot speak es
+[deepgram_tts.tts] Synthesizing 61 chars as aura-2-agustina-es (aura) for language es, speed=None, format=default

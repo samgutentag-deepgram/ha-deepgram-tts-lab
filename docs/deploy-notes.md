@@ -148,6 +148,38 @@ The argument for eventually installing it is loop speed, and it is not small: ev
 needs a full Home Assistant restart regardless, so the copy step is the only part that can be
 made instant.
 
+## The readiness signal, which is not what you would reach for
+
+Found on 2026-09-16 while running a real Home Assistant locally, and it will cost an hour on the
+Pi if it is not known.
+
+**Home Assistant answers `/api/` long before it has set up config entries.** A deploy script
+that waits for the API and then immediately calls TTS gets:
+
+```
+500  Error on init tts: Provider tts.deepgram_flux_haley not found
+```
+
+which reads exactly like a broken integration. The entry was simply not set up yet. Checked a
+minute later, the same instance had the entity and every call returned 200, with no change and
+no restart in between.
+
+Worse, the entry reports `state: not_loaded` with `reason: None` during that window, so the
+config entries API agrees with the wrong conclusion.
+
+**The readiness signal is the entity existing**, not the API answering and not the entry state:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$URL/api/states" \
+  | grep -o '"entity_id": *"tts.deepgram[^"]*"'
+```
+
+`scripts/local_ha.sh` waits on exactly that, and the wait is commented so nobody removes it.
+
+The same shape applies to the hand-check list: after a restart, wait for the entity before
+concluding anything about synthesis. A `tts.speak` call during startup fails for a reason that
+has nothing to do with Deepgram, the key, or the network.
+
 ## Open questions the tooling does not answer
 
 1. **Whether `reload_config_entry` is ever useful here.** It re-runs `async_setup_entry` against

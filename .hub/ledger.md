@@ -791,3 +791,73 @@ installed it is a one word change.
 `HA_DEPLOY_LOG_SOURCE` is `api` rather than `ssh` for the same reason.
 Source: .env.sample · .gitignore
 Routes to: the README's install section
+
+### [claim] It spoke. On a real Home Assistant, in seven languages, with the right voice each time
+The first sound this project has made. A real Home Assistant 2026.9.2 running locally on the
+Mac, with the integration symlinked into `custom_components/`, driven entirely through its HTTP
+API: onboarding, then the real config flow, then `tts_get_url`, then the audio fetched from the
+TTS proxy and played through `afplay`.
+Not the Pi, and not a speaker in the house. But a real Home Assistant, the real config flow, the
+real tts manager, and real Deepgram. Only the hardware and the network differ.
+What it proved, each one a line in the log rather than an inference:
+```
+Synthesizing 47 chars as flux-haley-en      (flux) for language en
+Synthesizing 47 chars as aura-2-agustina-es (aura) for language es
+Synthesizing 47 chars as aura-2-aurelia-de  (aura) for language de
+Synthesizing 47 chars as aura-2-agathe-fr   (aura) for language fr
+Synthesizing 47 chars as aura-2-cesare-it   (aura) for language it
+Synthesizing 47 chars as aura-2-ama-ja      (aura) for language ja
+Synthesizing 47 chars as aura-2-beatrix-nl  (aura) for language nl
+pt -> HTTP 500, correctly refused
+```
+**Settled decision 4 held on a real instance, seven for seven, with zero Flux leaks.** The
+Spanish clip was played and is audibly an Aura Spanish voice, not Haley reading Spanish.
+Also verified live rather than against a mock: a rejected key maps to `invalid_auth` in the
+config flow, the entry reaches `loaded`, the entity is named `tts.deepgram_flux_haley` with the
+title `Deepgram Flux (Haley)`, the voice picker renders 138 options with `flux-haley-en`
+preselected, and the audio out of the proxy is 24 kHz mono mp3.
+Captured, per `.hub/capture-plan.md`: `.hub/assets/first-sound-english-flux-haley.mp3`,
+`first-sound-spanish-aura-agustina.mp3`, `language-routing-live.log`,
+`first-authenticated-round-trip.log`.
+Source: .hub/assets/ · scripts/local_ha.sh · chapter 5 verification from HANDOFF section 6.1
+Routes to: both blog posts, the video slate, and this is the shot the capture plan was written for
+
+### [surprise] The label collision is seven collisions, not one
+Chapter 4 found that the null `display_name` fallback makes `aura-2-asteria-en` and
+`aura-asteria-en` both read as "Asteria". Counted against the live catalog: **138 voices produce
+131 distinct name-plus-family-plus-accent labels. Seven labels are ambiguous, covering 14
+voices.** Arcas, Asteria, Hera, Luna, Orion, Orpheus and Zeus each appear twice, every pair being
+a legacy `aura-*` next to its `aura-2-*` replacement, identical in family and accent.
+So 10 percent of the catalog would have been unpickable, not one voice. The decision to put the
+model id in the label was right for a reason an order of magnitude bigger than the one that
+prompted it.
+Source: live `/v1/models` and `/v2/models`, counted · custom_components/deepgram_tts/config_flow.py
+Routes to: technical blog post, and it is a better version of an already good section
+
+### [friction] Provider not found, and nothing was wrong
+Symptom: every `tts_get_url` call returned HTTP 500 with
+`Error on init tts: Provider tts.deepgram_flux_haley not found`, right after a restart. The
+config entries API agreed: `state: not_loaded`, `reason: None`. It read as an integration that
+had broken on restart.
+Cause: **Home Assistant answers `/api/` well before it finishes setting up config entries.** The
+readiness check was a `curl` against `/api/`, which succeeds within seconds, and the entry had
+not been set up yet. A reload a minute later worked first try with no change to anything.
+Fix: wait for the **entity** to appear, not for the API to answer and not for the entry state.
+`scripts/local_ha.sh` polls `/api/states` for `tts.deepgram*` and the wait carries a comment so
+nobody removes it as redundant.
+Worth writing down because the false conclusion is expensive: the natural next move is to start
+debugging the integration, the key, or the network, and all three are fine. Same trap waits on
+the Pi, where a restart takes longer and the window is wider.
+Source: docs/deploy-notes.md, the readiness section · scripts/local_ha.sh
+Routes to: the real-hardware checklist, a gotchas post
+
+### [asset] scripts/local_ha.sh, the Pi stand-in
+A throwaway Home Assistant on this machine with the integration symlinked in, onboarded over the
+API, config flow driven end to end including a deliberately rejected key, every supported
+language synthesized, and the English clip played.
+Symlinked rather than copied on purpose: an edit is live on the next restart and there is never a
+stale second copy to debug against.
+It is the closest thing to the Pi that exists without the Pi, and it is explicit about what it is
+not: no latency number from it belongs to the Pi, and it tests no playback device.
+Source: scripts/local_ha.sh · `./scripts/local_ha.sh`, `--stop` to tear down
+Routes to: the README, and the "how do I check this myself" section of the technical post
