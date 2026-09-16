@@ -46,7 +46,7 @@ fails the build when the two disagree, which is the right place for that check.
 | 8 | Exactly one integration per repository, one subdirectory under `custom_components/` | **Yes.** Only `deepgram_tts` | `custom_components/` |
 | 9 | Every file the integration needs lives inside that directory | **Yes** | `custom_components/deepgram_tts/` |
 | 10 | `manifest.json` has `domain`, `name`, `documentation`, `issue_tracker`, `codeowners`, `version` | **Yes.** All six, `version` is `0.1.0` | [`manifest.json`](../custom_components/deepgram_tts/manifest.json) |
-| 11 | Brand assets: a `brand/` directory with at least `icon.png`, or an entry in `home-assistant/brands` | **No.** Neither exists | section 4 |
+| 11 | Brand assets: a `brand/` directory with at least `icon.png`, or an entry in `home-assistant/brands` | **Yes, already.** `home-assistant/brands` has a `custom_integrations/deepgram_tts/` entry with all four files, and the CDN serves them. Verified 2026-09-16 | section 4 |
 | 12 | A `country` key in `hacs.json` if the integration is region limited | Not applicable. Deepgram is not region gated | |
 | 13 | Not an alpha or beta of a core integration, and does not override one | **Yes.** `deepgram_tts` is not a core domain | |
 | 14 | Submitted by the repo owner or a major contributor | **Yes**, once Sam opens it | |
@@ -72,7 +72,8 @@ Both actions have to pass with no errors before the `hacs/default` pull request 
 | 16 | `home-assistant/actions/hassfest@master` | Wired, never run locally | [`validate.yml`](../.github/workflows/validate.yml) |
 | 17 | ruff check and format | **Passing** | `validate.yml`, `uvx ruff@0.16.7` |
 | 18 | Local manifest, translations, and import check | **Passing** | [`manifest_check.py`](../scripts/manifest_check.py) |
-| 19 | pytest | **Passing**, 77 tests | `validate.yml` |
+| 19 | pytest | **Passing**, 122 tests on main | `validate.yml` |
+| 20 | Local HACS and hassfest stand-in | **Passing**, 22 verified, 0 failures | [`hacs_check.py`](../scripts/hacs_check.py) |
 
 hassfest ships as a Docker action and there is no Docker daemon on the build machine, so it has
 never run here. `scripts/manifest_check.py` is the local stand-in: manifest keys present and in
@@ -89,7 +90,45 @@ A public repo's shell scripts get read. Run it once before the flip.
 
 ---
 
-## 4. Brands, which is a separate pull request to a separate repository
+## 4. Brands: already done, and not by us
+
+**This requirement is already satisfied and nobody here did it.** Checked on 2026-09-16:
+
+```
+GET api.github.com/repos/home-assistant/brands/contents/custom_integrations/deepgram_tts -> 200
+  icon.png       6267 bytes
+  icon@2x.png   10126 bytes
+  logo.png       9774 bytes
+  logo@2x.png   20627 bytes
+
+GET brands.home-assistant.io/deepgram_tts/icon.png      -> 200, 256x256 PNG
+GET brands.home-assistant.io/deepgram_tts/icon@2x.png   -> 200
+GET brands.home-assistant.io/deepgram_tts/logo.png      -> 200
+GET brands.home-assistant.io/deepgram_tts/dark_icon.png -> 200
+```
+
+Brand assets in that repository are keyed on the **integration domain**, not on the repository or
+the author. This project's domain is `deepgram_tts`, which is the same domain the community
+integration used, so we inherit an entry somebody already got merged for it.
+
+That removes the only requirement on this list that needed an asset nobody had made, and it
+removes a pull request into a review queue on someone else's repository.
+
+Two things worth being clear-eyed about:
+
+- **It is somebody else's submission of Deepgram's mark.** It is correct, it is 256x256 as
+  specified, and it is already serving. It is also not ours, and if the brands repo ever tightens
+  ownership rules for custom integration entries, this is the item that would come back.
+- **It is another reason to keep the domain.** Changing `deepgram_tts` to anything else would
+  silently lose the icon and put the brands pull request back on the list.
+
+Sam works at Deepgram, which makes checking that the mark in that repo is the current one a
+cheap thing to do and not a less necessary one.
+
+The file spec below is kept for reference, in case a dark variant or a refreshed mark is ever
+wanted.
+
+### File spec, for reference
 
 This is the item that needs work nobody has started, because it needs image files rather than
 code. There are two ways to satisfy it as of Home Assistant 2026.3, and the newer one is easier:

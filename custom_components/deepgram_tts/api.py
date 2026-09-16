@@ -119,8 +119,14 @@ class DeepgramClient:
     def stream(self, *, model: str, speed: float | None = None) -> FluxSocket:
         """Open one streaming turn against the Flux socket.
 
-        The client hands back a socket rather than exposing the API key, so the key stays in
-        the one object that owns it and the entity never holds a copy.
+        On this branch the entity does define `async_stream_tts_audio`, so this is the live
+        path for every Assist response. On main the same method exists and is inert, because
+        Home Assistant only routes down the streaming path when the entity overrides that
+        method, and there it does not. `scripts/live_stream_check.py` uses this either way, to
+        exercise the real socket client against the real API without the entity opting in.
+
+        The client hands back a socket rather than exposing the API key, so the key stays in the
+        one object that owns it.
         """
         return FluxSocket(self._session, self._api_key, model=model, speed=speed)
 
@@ -208,9 +214,15 @@ def _build_params(
         params["container"] = container
 
     if sample_rate is not None:
-        if encoding == ENCODING_MP3:
+        # Dropped for an explicit mp3 AND for no encoding at all, because mp3 is the default.
+        # Verified live 2026-09-16: sample_rate with no encoding returns
+        # 400 UNSUPPORTED_AUDIO_FORMAT, "`sample_rate` is not applicable when `encoding=mp3`".
+        # Chapter 2 followed the interface contract literally and only dropped it for the
+        # explicit case, which left a request the API rejects reachable through the default.
+        if encoding in (None, ENCODING_MP3):
             _LOGGER.debug(
-                "Dropping sample_rate=%s: the API rejects it as not applicable to mp3",
+                "Dropping sample_rate=%s: not applicable to mp3, which is the default when no "
+                "encoding is given",
                 sample_rate,
             )
         else:

@@ -168,6 +168,19 @@ class DeepgramTTSEntity(TextToSpeechEntity):
         # client would drop it anyway.
         speed = options.get(CONF_SPEED) if voice.is_flux else None
 
+        # Logged because the model actually sent is the only thing worth checking on a real
+        # instance. The configured option, the requested language and the resolved voice can all
+        # disagree, and a hand-check that reads the option learns nothing.
+        _LOGGER.debug(
+            "Synthesizing %d chars as %s (%s) for language %s, speed=%s, format=%s",
+            len(message),
+            voice.voice_id,
+            voice.family,
+            language,
+            speed,
+            options.get(ATTR_PREFERRED_FORMAT) or "default",
+        )
+
         result = await self._client.async_synthesize(
             message,
             model=voice.voice_id,

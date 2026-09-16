@@ -1,0 +1,13 @@
+catalogs (no auth required)
+  /v2/models flux tts: 36 entries (flux-tts=36) -> matches HANDOFF
+  /v1/models aura tts: 102 entries (aura=12, aura-2=90) -> matches HANDOFF
+
+synthesis (authenticated)
+  flux  /v2/speak flux-haley-en: HTTP 200, audio/mpeg, 19008 bytes, 1.97s, first4=ff f3 64 c4 -> scripts/out/flux-haley-en.bin
+  aura  /v1/speak aura-2-thalia-en: HTTP 200, audio/mpeg, 15984 bytes, 1.33s, first4=ff f3 64 c4 -> scripts/out/aura-2-thalia-en.bin
+
+================================================================
+catalogs:  PASS
+synthesis: PASS
+chapter 2 live check: PASS
+================================================================

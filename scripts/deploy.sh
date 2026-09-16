@@ -13,7 +13,8 @@
 # Every variable is read from the environment. An optional env file is sourced
 # first, so nothing secret has to live in a shell history. That file is gitignored.
 #
-#   HA_DEPLOY_ENV_FILE      Path to the env file. Default: scripts/.ha-deploy.env
+#   HA_DEPLOY_ENV_FILE      Path to the env file. Default: .env at the repo root,
+#                           or scripts/.ha-deploy.env when that exists.
 #
 # Required:
 #
@@ -89,7 +90,15 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 SOURCE_DIR="$REPO_ROOT/custom_components/deepgram_tts"
 
-ENV_FILE="${HA_DEPLOY_ENV_FILE:-$SCRIPT_DIR/.ha-deploy.env}"
+# One env file for the whole repo. scripts/.ha-deploy.env still wins if it exists,
+# so an older setup keeps working, but .env at the repo root is the documented one.
+if [ -n "${HA_DEPLOY_ENV_FILE:-}" ]; then
+  ENV_FILE="$HA_DEPLOY_ENV_FILE"
+elif [ -f "$SCRIPT_DIR/.ha-deploy.env" ]; then
+  ENV_FILE="$SCRIPT_DIR/.ha-deploy.env"
+else
+  ENV_FILE="$SCRIPT_DIR/../.env"
+fi
 if [ -f "$ENV_FILE" ]; then
   say "$PROG: reading $ENV_FILE"
   set -a

@@ -633,3 +633,231 @@ audio can be streamed." Settled decision 6 was right for a reason that was not k
 settled.
 Source: docs/hardware-bom.html · docs/hardware-notes.md
 Routes to: the buy list, user-facing blog post, video B-roll planning
+
+### [claim] We shipped the exact bug we founded the project on avoiding, and a review caught it
+HANDOFF section 2.2's first and heaviest do-not-repeat: do not let a broad handler turn your own
+auth error into something else, because a caller cannot then tell an expired key from a dead
+network. Every error path in `api.py` was built to honor that, and `api.py` came out of the
+skeptic review as the strongest file in the repo.
+And then `stream.py` did it anyway, on the primary path. A rejected key fails the **HTTP
+upgrade**, so it never produces an in-band `Error` frame. It arrives as
+`WSServerHandshakeError`, which is a `ClientError` subclass, so the generic handler turned it
+into `DeepgramConnectionError`. The test that looked like it covered this,
+`test_auth_shaped_server_error_raises_auth_error`, exercises an in-band error frame, which a
+real expired key almost certainly never sends.
+Worse on the chapter 6 branch than on main: the fallback catches exactly that class, so an
+expired key would have quietly retried the same dead key against `/v2/speak`, failed again, and
+reported whichever error came second. The cause hidden twice.
+Did not hold, and the interesting part is why. The rule was written down, understood, honored
+everywhere it was being thought about, and broken in the one place where the auth failure
+arrives through a transport nobody was picturing. **Knowing the rule is not the same as knowing
+where it applies**, and the only thing that closed the gap was somebody adversarially reading
+code they did not write.
+Fixed: handled ahead of `ClientError`, parametrized over 401 and 403, and `DeepgramAuthError`
+now propagates past the streaming fallback on purpose.
+Source: custom_components/deepgram_tts/stream.py · tests/test_stream.py::test_a_rejected_key_on_the_handshake_is_an_auth_error · docs/review/skeptic-pass-2026-09-15.md finding 1
+Routes to: technical blog post, and it is the honest ending the post needed
+
+### [claim] Two things with ledger entries behind them had no test, and deleting them stayed green
+Mutation testing planted 15 defects and the suite caught 13. The two it missed both had prose in
+this file explaining why they mattered.
+**Deleting the family guard from `resolve_voice` passed all 62 tests.** The six-language
+parametrize looked like it covered settled decision 4, and did not: its fixture gave each
+language exactly one voice and that voice was Aura, so "first non-Flux candidate" and "first
+candidate" were the same object. The guard could be removed without anything failing.
+**Deleting `await self._finish_sender(sender)` entirely passed all 62 tests.** Sixteen lines with
+a whole ledger entry behind them and zero coverage. `FakeSocket.closed` was tracked and never
+asserted.
+Both now have tests that fail when the code is removed. The transferable lesson, which is
+sharper than "write more tests": **a test whose fixture makes two different behaviors produce
+the same answer is not a test, and reads exactly like one.** The only way we found out was
+deleting the code and watching nothing break.
+Source: docs/review/skeptic-pass-2026-09-15.md findings 3 and 4 · tests/test_catalog.py::test_the_family_guard_is_load_bearing_for_every_language
+Routes to: technical blog post, the testing section, and a standalone post on mutation testing
+
+### [friction] ruff's own formatter emitted syntax that would have crashed CI
+Symptom: the CI `lint` job runs `python3 scripts/manifest_check.py`, which parses the integration
+with `ast`, and it would have crashed on the runner rather than reporting anything.
+Cause: `pyproject.toml` sets `target-version = "py314"`, so `ruff format` rewrote a
+parenthesized `except (DeepgramAuthError, DeepgramConnectionError):` into PEP 758's
+unparenthesized form. That is a `SyntaxError` on anything older than 3.14, and the job had no
+`setup-python` step, so it would have run on the runner's system interpreter.
+Fix: pin 3.14 in the lint job. The syntax is correct for this project and the formatter was
+right; the job was wrong about which interpreter it needed.
+Worth recording because the guard against undeclared imports is the one CI check this project
+most depends on, and it would have been silently broken on the very first push. Confirmed
+locally: `/usr/bin/python3` is 3.9.6 and cannot parse `stream.py`.
+Source: .github/workflows/validate.yml · docs/review/skeptic-pass-2026-09-15.md finding 6
+Routes to: technical blog post, a gotchas post about target-version
+
+### [decision] The chapter 6 merge gate does not test what it gates, and that is recorded not fixed
+`scripts/measure_first_frame.py` was written as the gate: produce a first-frame number on the
+real instance, then chapter 6 may merge. The review pointed out that the script **never imports
+`stream.py`.** It opens its own socket and talks to Deepgram directly, and its
+`degraded_cleanly` check exercises the batch endpoint rather than the entity's fallback.
+So satisfying the gate as written would produce a real, quotable latency number and would
+validate none of the code the gate exists to protect.
+Left unfixed on purpose, and the choice is worth stating. Rewriting the script to drive
+`FluxSocket` would make it depend on a Home Assistant import graph, which is the reason it is
+stdlib plus aiohttp and runnable on a bare Pi in one command. The better answer is a second gate
+step that runs on the instance with the branch deployed, which cannot be written until there is
+an instance to run it on.
+**A gate that does not test what it gates is worse than no gate**, because it converts a real
+check into a ritual. Written down so nobody mistakes the number for the verification.
+Source: docs/review/skeptic-pass-2026-09-15.md finding 12 · docs/chapter-6-notes.md
+Routes to: chapter 6's merge checklist, technical blog post
+
+### [correction] Two more corrections to entries above
+Append-only, so these are new entries rather than edits.
+**"Settled decision 4 survives a catalog that is wrong about itself" was false when written.** The
+entry described the last-resort branch's language guard accurately and then generalized it to the
+whole function. The preferred-voice branch was guarded on neither language nor family and trusted
+the catalog completely, and `resolve_voice(catalog, "es", "flux-rogue-es")` returned a Flux
+voice. Reproduced, not theorized. It is true now, and the fix is one `elif`.
+This one matters beyond the file: that sentence was headed for a blog post as a design win, and
+it would have been a claim a reader could falsify in four lines.
+**"17 socket tests" was 16.** The suite total of 62 was right. Current counts: main 120,
+`chapter-6-streaming` 130.
+Source: docs/review/skeptic-pass-2026-09-15.md · custom_components/deepgram_tts/catalog.py `resolve_voice`
+Routes to: the blog draft, which needs that sentence rewritten before it goes anywhere
+
+## 2026-09-16
+
+### [friction] The Asana project exists and is in no team, and two tasks landed in My Tasks
+Symptom: a created project came back with `team: null` and `privacy_setting: private`, and the
+first two tasks came back with `projects: []` and permalinks pointing at a different project id
+entirely, which turned out to be Sam's My Tasks list.
+Cause, two separate parameter-name mistakes made by guessing instead of reading the schema.
+`asana_create_project` takes **`team`**, not `team_gid`, so the team argument was silently
+ignored rather than rejected. `asana_create_task` takes **`project_id`**, a single string, not
+`projects`, an array.
+Fix: deleted both orphaned tasks and recreated all four with `project_id`. Verified by reading
+each one back rather than trusting the create response: all four now report the project in
+their `memberships`.
+**Not fixed, and it cannot be from here.** `update_project` has no `team` field and there is no
+delete-project tool, so the project cannot be moved into Developer Relations and cannot be
+recreated without leaving a duplicate behind. A second project was deliberately not created,
+because a silent second project is how a repo ends up with two. One manual move in the Asana UI
+fixes it.
+The lesson is narrower than "read the docs": **an API that silently ignores an unknown argument
+instead of rejecting it turns a typo into a wrong-looking success.** The create call returned
+HTTP 200 with a complete project object. Only reading the `team` field back showed the problem,
+which is exactly the reason the project-hub skill insists on reporting partial failures by name.
+Source: .hub/hub.yml, the asana block and the note under it · https://app.asana.com/1/411927538413705/project/1218530151668605
+Routes to: one manual move in Asana, and a gotchas post about write APIs that ignore unknown fields
+
+### [surprise] The apps that are installed are not the ones that matter, and the ports said so
+Sam answered that the instance is Home Assistant OS on a Pi with an NVMe drive, on
+`homeassistant.local`, with File Editor, Studio Code Server, Zigbee2MQTT and MQTT installed.
+That reads like a well equipped instance. Then the probe: `homeassistant.local` resolves to
+192.168.1.197, port 8123 answers with HTTP 200 and `/api/` answers 401, and ports **22, 22222,
+445 and 139 are all refused.**
+So there is no SSH, no host shell, and no Samba. File Editor and Studio Code Server are browser
+based: they can create a file and they cannot receive one from a laptop. `deploy.sh` had nowhere
+to connect, and the recommendation the deployment research landed on, rsync over ssh, was
+unavailable on the actual machine.
+Worth recording because the question that was asked was "which apps are installed" and the
+question that decides the answer is "which ports are open." Asking a person to enumerate their
+add-ons gets you a list of what they use; four `nc` calls get you what you can actually do.
+Source: docs/deploy-notes.md, the answered table · `nc -z homeassistant.local` on 22, 22222, 445, 139
+Routes to: the real-hardware checklist, technical blog post
+
+### [decision] Serve the bundle over HTTP instead of installing an add-on
+Sam chose manual copy over installing the Advanced SSH and Web Terminal app. Hand-copying twelve
+files into a browser editor is the bad version of that, so what lost was leaving it at that, and
+what was chosen was making manual copy two commands.
+The fact the whole approach rests on: **the Pi can reach this laptop**, even though the laptop
+cannot reach the Pi on any file transfer port. So `scripts/serve_bundle.sh` tars the integration,
+serves it on one port with `python3 -m http.server` for one download, and prints the single line
+to paste into Studio Code Server's built-in terminal, which has a shell with access to
+`/config`.
+Cost: a 20 KB tarball and a server that shuts itself down after the download or a timeout.
+Verified end to end over the real LAN address rather than over loopback, which would have proved
+nothing: twelve files in the archive, all twelve byte-identical after extraction, and the only
+difference from the source tree is `__pycache__`, excluded on purpose.
+What it cannot do is restart Home Assistant, and that is not optional. Python that is already
+imported does not change without a restart, so a copied file does nothing on its own.
+Source: scripts/serve_bundle.sh · docs/deploy-notes.md
+Routes to: user-facing blog post, since anyone on HA OS with no SSH has this same problem
+
+### [asset] .env.sample, with the instance's real values already filled in
+`.env.sample` at the repo root, copied to a gitignored `.env`. One file for everything: both
+shell scripts now fall back to it, and the Python scripts read the environment after
+`set -a && source .env && set +a`.
+`HA_DEPLOY_TRANSPORT` is deliberately left **empty** rather than set to `rsync`, because the
+port probe says rsync has nowhere to connect and a script that refuses beats a script that
+guesses. Every other value is already correct for the rsync path, so if the SSH app ever gets
+installed it is a one word change.
+`HA_DEPLOY_LOG_SOURCE` is `api` rather than `ssh` for the same reason.
+Source: .env.sample · .gitignore
+Routes to: the README's install section
+
+### [claim] It spoke. On a real Home Assistant, in seven languages, with the right voice each time
+The first sound this project has made. A real Home Assistant 2026.9.2 running locally on the
+Mac, with the integration symlinked into `custom_components/`, driven entirely through its HTTP
+API: onboarding, then the real config flow, then `tts_get_url`, then the audio fetched from the
+TTS proxy and played through `afplay`.
+Not the Pi, and not a speaker in the house. But a real Home Assistant, the real config flow, the
+real tts manager, and real Deepgram. Only the hardware and the network differ.
+What it proved, each one a line in the log rather than an inference:
+```
+Synthesizing 47 chars as flux-haley-en      (flux) for language en
+Synthesizing 47 chars as aura-2-agustina-es (aura) for language es
+Synthesizing 47 chars as aura-2-aurelia-de  (aura) for language de
+Synthesizing 47 chars as aura-2-agathe-fr   (aura) for language fr
+Synthesizing 47 chars as aura-2-cesare-it   (aura) for language it
+Synthesizing 47 chars as aura-2-ama-ja      (aura) for language ja
+Synthesizing 47 chars as aura-2-beatrix-nl  (aura) for language nl
+pt -> HTTP 500, correctly refused
+```
+**Settled decision 4 held on a real instance, seven for seven, with zero Flux leaks.** The
+Spanish clip was played and is audibly an Aura Spanish voice, not Haley reading Spanish.
+Also verified live rather than against a mock: a rejected key maps to `invalid_auth` in the
+config flow, the entry reaches `loaded`, the entity is named `tts.deepgram_flux_haley` with the
+title `Deepgram Flux (Haley)`, the voice picker renders 138 options with `flux-haley-en`
+preselected, and the audio out of the proxy is 24 kHz mono mp3.
+Captured, per `.hub/capture-plan.md`: `.hub/assets/first-sound-english-flux-haley.mp3`,
+`first-sound-spanish-aura-agustina.mp3`, `language-routing-live.log`,
+`first-authenticated-round-trip.log`.
+Source: .hub/assets/ · scripts/local_ha.sh · chapter 5 verification from HANDOFF section 6.1
+Routes to: both blog posts, the video slate, and this is the shot the capture plan was written for
+
+### [surprise] The label collision is seven collisions, not one
+Chapter 4 found that the null `display_name` fallback makes `aura-2-asteria-en` and
+`aura-asteria-en` both read as "Asteria". Counted against the live catalog: **138 voices produce
+131 distinct name-plus-family-plus-accent labels. Seven labels are ambiguous, covering 14
+voices.** Arcas, Asteria, Hera, Luna, Orion, Orpheus and Zeus each appear twice, every pair being
+a legacy `aura-*` next to its `aura-2-*` replacement, identical in family and accent.
+So 10 percent of the catalog would have been unpickable, not one voice. The decision to put the
+model id in the label was right for a reason an order of magnitude bigger than the one that
+prompted it.
+Source: live `/v1/models` and `/v2/models`, counted · custom_components/deepgram_tts/config_flow.py
+Routes to: technical blog post, and it is a better version of an already good section
+
+### [friction] Provider not found, and nothing was wrong
+Symptom: every `tts_get_url` call returned HTTP 500 with
+`Error on init tts: Provider tts.deepgram_flux_haley not found`, right after a restart. The
+config entries API agreed: `state: not_loaded`, `reason: None`. It read as an integration that
+had broken on restart.
+Cause: **Home Assistant answers `/api/` well before it finishes setting up config entries.** The
+readiness check was a `curl` against `/api/`, which succeeds within seconds, and the entry had
+not been set up yet. A reload a minute later worked first try with no change to anything.
+Fix: wait for the **entity** to appear, not for the API to answer and not for the entry state.
+`scripts/local_ha.sh` polls `/api/states` for `tts.deepgram*` and the wait carries a comment so
+nobody removes it as redundant.
+Worth writing down because the false conclusion is expensive: the natural next move is to start
+debugging the integration, the key, or the network, and all three are fine. Same trap waits on
+the Pi, where a restart takes longer and the window is wider.
+Source: docs/deploy-notes.md, the readiness section · scripts/local_ha.sh
+Routes to: the real-hardware checklist, a gotchas post
+
+### [asset] scripts/local_ha.sh, the Pi stand-in
+A throwaway Home Assistant on this machine with the integration symlinked in, onboarded over the
+API, config flow driven end to end including a deliberately rejected key, every supported
+language synthesized, and the English clip played.
+Symlinked rather than copied on purpose: an edit is live on the next restart and there is never a
+stale second copy to debug against.
+It is the closest thing to the Pi that exists without the Pi, and it is explicit about what it is
+not: no latency number from it belongs to the Pi, and it tests no playback device.
+Source: scripts/local_ha.sh · `./scripts/local_ha.sh`, `--stop` to tear down
+Routes to: the README, and the "how do I check this myself" section of the technical post

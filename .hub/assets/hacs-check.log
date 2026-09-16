@@ -1,0 +1,33 @@
+ok    exactly one integration: deepgram_tts
+ok    README.md present, which HACS renders in its UI
+ok    LICENSE present
+ok    manifest domain matches the directory name: deepgram_tts
+ok    manifest has all six keys HACS requires, version included
+ok    manifest version parses: 0.1.0
+ok    iot_class is valid: cloud_polling
+ok    integration_type is valid: service
+ok    config_flow is true and config_flow.py exists
+ok    hacs.json name: Deepgram TTS
+ok    every hacs.json key is one HACS actually reads
+ok    hacs.json declares a Home Assistant floor: 2026.9.0
+ok    strings.json and translations/en.json are identical
+ok    every shown flow step has a translation: ['init', 'user', 'voice']
+ok    every config flow error key has a translation: ['cannot_connect', 'invalid_auth', 'unknown']
+ok    hassfest action is wired into CI
+ok    HACS validation action is wired into CI
+ok    a workflow pins a Python version, which the ast-based checks need
+ok    brands.home-assistant.io already serves an icon for deepgram_tts (2999 bytes), so no brands pull request is needed
+ok      and icon@2x.png
+ok      and logo.png
+ok      and dark_icon.png
+SKIP  manifest documentation is 404 because the public repo does not exist yet: https://github.com/samgutentag-deepgram/ha-deepgram-tts
+SKIP  manifest issue_tracker is 404 because the public repo does not exist yet: https://github.com/samgutentag-deepgram/ha-deepgram-tts/issues
+SKIP  public repository on GitHub: this is a private lab repo until the flip
+SKIP  repository description: a GitHub setting, shown in the HACS UI
+SKIP  repository topics: a GitHub setting
+SKIP  a published GitHub release, not just a tag: none exists yet
+SKIP  addable to HACS as a custom repository: HACS has never fetched this repo
+SKIP  hassfest and hacs/action passing on a public repo: both need item one
+
+22 verified, 8 unverifiable from here, 0 would be rejected
+Everything checkable here passes. The skips are real requirements, not noise.
