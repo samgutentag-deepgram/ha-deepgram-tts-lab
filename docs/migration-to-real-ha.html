@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<!--
+  Canonical print-ready HTML document template for Sam.
+  Source of truth for ALL standalone HTML docs authored under ~/Developer
+  (reports, specs, notes, briefs, study guides, checklists, reference).
+
+  Referenced by ~/.claude/CLAUDE.md > Document Format.
+
+  RULES FOR CLAUDE:
+  - Use the <style> block, the #theme-toggle button, and the theme <script>
+    VERBATIM. Do not restyle, rename variables, reorder, or regenerate them
+    from memory. They must look and behave identically in every document.
+  - Only replace the <title>, the visible content between the markers, and
+    (if needed) ADD new content-specific classes at the END of the <style>
+    block. Never edit the theme variables or the toggle chrome.
+  - The base rules already encode Sam's conventions: serif body, system-sans
+    headings, minimal color, page-break-friendly, no external assets.
+  - No em dashes in the content. Preserve any verbatim quoted text exactly.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moving Deepgram Flux TTS to the real Home Assistant</title>
+<style>
+  /* ===== THEME CHROME — DO NOT EDIT (keep identical across all docs) ===== */
+  :root {
+    --bg: #fff;
+    --text: #1a1a1a;
+    --heading: #111;
+    --muted: #555;
+    --muted2: #444;
+    --faint: #666;
+    --rule: #ddd;
+    --dot: #e2e2e2;
+    --code-bg: #f2f2f2;
+    --setup-bg: #f6f6f4;
+    --setup-border: #e0e0dc;
+    --watch-bg: #fbf7ec;
+    --watch-border: #b58900;
+    --btn-bg: #f0f0ee;
+    --btn-border: #ccc;
+    --accent: #c9a227;
+  }
+  html[data-theme="dark"] {
+    --bg: #17191d;
+    --text: #cfd2d6;
+    --heading: #f1f2f4;
+    --muted: #9aa0a6;
+    --muted2: #b3b8bd;
+    --faint: #888e94;
+    --rule: #34383e;
+    --dot: #2b2f34;
+    --code-bg: #262a30;
+    --setup-bg: #1e2126;
+    --setup-border: #34383e;
+    --watch-bg: #241f14;
+    --watch-border: #c9a227;
+    --btn-bg: #23262b;
+    --btn-border: #3a3f45;
+  }
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #theme-toggle:hover { border-color: var(--faint); }
+  /* ===== END THEME CHROME ===== */
+
+  /* ===== BASE DOCUMENT STYLE (Sam's standing conventions) ===== */
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 46rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    background: var(--bg);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  h1, h2, h3 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--heading);
+  }
+  h1 { font-size: 1.7rem; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin: 2.2rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+    page-break-after: avoid;
+  }
+  h3 { font-size: 1.02rem; margin: 1.5rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--accent); }
+  code {
+    font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--watch-border);
+    background: var(--watch-bg);
+    margin: 0.8rem 0;
+    padding: 0.7rem 0.9rem;
+    page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--rule); padding: 0.45rem 0.7rem; text-align: left; font-size: 0.95rem; }
+  th { font-family: system-ui, sans-serif; }
+  .meta { margin-top: 2.5rem; color: var(--faint); font-size: 0.85rem; font-family: system-ui, sans-serif; }
+  /* ===== END BASE ===== */
+
+  /* ===== PRINT: force clean light, hide the toggle ===== */
+  @media print {
+    :root { --bg:#fff; --text:#1a1a1a; --heading:#111; --setup-bg:#f6f6f4; --watch-bg:#fbf7ec; --code-bg:#f2f2f2; }
+    body { margin: 0; font-size: 12pt; }
+    blockquote, pre { background: none; }
+    #theme-toggle { display: none; }
+  }
+
+  /* ===== Document-specific styles may be ADDED below this line ===== */
+
+  .step { border-left: 3px solid var(--rule); padding: 0.1rem 0 0.1rem 1rem; margin: 1.3rem 0; }
+  .step h3 { margin-top: 0.3rem; }
+  .gate { border: 2px solid var(--watch-border); background: var(--watch-bg);
+    border-radius: 6px; padding: 0.9rem 1.1rem; margin: 1.4rem 0; page-break-inside: avoid; }
+  .gate h3 { margin-top: 0; }
+  .check { list-style: none; padding-left: 0; }
+  .check li { margin: 0.45rem 0; padding-left: 1.7rem; text-indent: -1.7rem; }
+  .check li::before { content: "\2610\00a0\00a0"; font-family: monospace; color: var(--muted); }
+  .done li::before { content: "\2611\00a0\00a0"; color: var(--accent); }
+  .tag { font-family: system-ui, sans-serif; font-size: 0.72rem; letter-spacing: 0.05em;
+    text-transform: uppercase; border: 1px solid var(--rule); border-radius: 3px;
+    padding: 0.05em 0.4em; color: var(--muted); white-space: nowrap; }
+
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" type="button" aria-label="Toggle dark mode">Light mode</button>
+
+<!-- ===== CONTENT START ===== -->
+<h1>Moving Deepgram Flux TTS to the real Home Assistant</h1>
+<p class="meta" style="margin-top:0.3rem">Written 2026-09-16 &middot; <code>main</code> at
+<code>ece0621</code>, 53 commits, 122 tests &middot; <code>chapter-6-streaming</code> at
+<code>1a08e6a</code>, 5 commits ahead, 132 tests</p>
+
+<p>This is the plan for taking what runs on the Mac tonight and putting it on the Raspberry Pi,
+then onto HACS. It is written to be picked up cold after a gap, so it restates what is already
+true rather than assuming you remember.</p>
+
+<h2>Where this actually is</h2>
+
+<p><strong>The integration works.</strong> On 2026-09-16 a real Home Assistant 2026.9.2 ran on
+the Mac with this code installed, the real config flow created a real entry, and it spoke out
+loud in all seven supported languages with the right voice family for each, then played through
+the Sonos Beam in the living room. That is not a unit test result, it is audio a person heard.</p>
+
+<p>What is verified, with the evidence in <code>.hub/assets/</code>:</p>
+
+<ul class="check done">
+<li>Authenticated round trips against <code>/v2/speak</code> and <code>/v1/speak</code></li>
+<li>Config flow end to end, including a rejected key mapping to <code>invalid_auth</code></li>
+<li>Seven languages, each resolving to the correct voice family, <code>pt</code> correctly refused</li>
+<li>Settled decision 4 on a live instance: zero Flux leaks for non-English</li>
+<li>The Flux websocket: 24 kHz confirmed, WAV decodable by ffmpeg, 99 ms to first audio</li>
+<li>An expired key on the socket reported as auth, not as a dead network</li>
+<li>Playback through a Sonos Beam, including a stream with no <code>Content-Length</code></li>
+<li>HACS distribution rules: 22 verified, 0 failures, brand assets already exist</li>
+</ul>
+
+<p><strong>What is not verified is everything about the Pi, and one thing about Assist.</strong>
+No line of this has run on ARM, on that instance, or through a real Assist pipeline. That last one
+matters more than it sounds and is step 4 below.</p>
+
+<h2>Step 1. Get the code onto the Pi</h2>
+
+<div class="step">
+<h3>The situation, so you do not rediscover it</h3>
+<p>Probed 2026-09-15: <code>homeassistant.local</code> is <code>192.168.1.197</code>, port 8123
+answers and <code>/api/</code> returns 401, and ports <strong>22, 22222, 445 and 139 are all
+refused</strong>. There is no SSH app and no Samba. File Editor and Studio Code Server are browser
+based: they can create a file and cannot receive one from the laptop. So <code>deploy.sh</code>
+has nowhere to connect, which is why <code>HA_DEPLOY_TRANSPORT</code> is deliberately blank in
+<code>.env.sample</code>.</p>
+
+<p>The Pi can still reach the laptop, which is what the copy path uses.</p>
+
+<pre><code>set -a &amp;&amp; source .env &amp;&amp; set +a
+./scripts/serve_bundle.sh</code></pre>
+
+<p>It tars the integration, serves it on the LAN for exactly one download, prints the single line
+to paste into the Studio Code Server terminal, and shuts the server down afterward. Verified over
+the real LAN address: twelve files, all byte-identical after extraction.</p>
+
+<p>Then <strong>restart Home Assistant</strong>. Developer tools, YAML tab, Restart. This is not
+optional: <code>sys.modules</code> caches the import, so Python that Home Assistant has already
+loaded does not change without a restart. <code>reload_config_entry</code> re-runs setup against
+the module already in memory and will not pick up a single line of this.</p>
+
+<p><strong>If you would rather have a fast loop, install the Advanced SSH and Web Terminal app
+first.</strong> Then <code>HA_DEPLOY_TRANSPORT=rsync</code> in <code>.env</code> is a one word
+change and every other value in there is already correct: host, user <code>root</code>, port 22,
+config dir <code>/config</code>. You still restart every time, but the copy becomes instant.</p>
+</div>
+
+<h2>Step 2. Configure it</h2>
+
+<div class="step">
+<p>Settings, Devices and services, Add integration, <strong>Deepgram TTS</strong>. Paste the key
+from <code>.env</code>. The voice step shows 138 voices with <code>flux-haley-en</code>
+preselected; accept it.</p>
+<p>The entity will be <code>tts.deepgram_flux_haley</code>, titled
+<strong>Deepgram Flux (Haley)</strong>.</p>
+<p><strong>Wait for the entity before concluding anything.</strong> Home Assistant answers
+<code>/api/</code> long before it finishes setting up config entries, and a TTS call in that
+window returns <code>Provider not found</code> and looks exactly like a broken integration. The
+entry even reports <code>state: not_loaded</code> with <code>reason: None</code> during it. The
+readiness signal is the entity existing.</p>
+</div>
+
+<h2>Step 3. Point it at the Sonos and make a sound</h2>
+
+<div class="step">
+<p>The Sonos integration is first party and discovers over SSDP with no configuration. The Beam
+is already known to work. Developer tools, Actions, <code>tts.speak</code>:</p>
+
+<pre><code>action: tts.speak
+target:
+  entity_id: tts.deepgram_flux_haley
+data:
+  media_player_entity_id: media_player.sonos_beam
+  cache: false
+  message: The back door has been unlocked since four this afternoon.</code></pre>
+
+<p><strong>Do not verify this from the media player state.</strong> Home Assistant plays Sonos
+announcements as an audio clip overlay via <code>loadAudioClip</code> on the Sonos websocket,
+which never touches transport state. The speaker will say the words while the entity still reads
+<code>idle</code>. Verify by ear, or from the log with
+<code>homeassistant.components.sonos</code> at debug, where the line reads
+<code>Playing ... using websocket audioclip</code>.</p>
+
+<p><code>cache: false</code> matters on every test call. The TTS manager keys its cache on
+message plus language plus options plus engine, so a repeated message replays the first result
+and never reaches the integration at all.</p>
+</div>
+
+<h2>Step 4. The tests that have to pass before HACS</h2>
+
+<p><code>docs/chapter-5-notes.md</code> has the full eleven item hand-check list with paste-ready
+YAML. These four are the ones that are not covered by anything that has already run.</p>
+
+<div class="gate">
+<h3>The four that matter</h3>
+<ol>
+<li><strong>A real Assist pipeline, end to end.</strong> Everything so far went through
+<code>tts.speak</code> and <code>tts_get_url</code>. Assist uses the <em>streaming</em> path,
+which is the one with the trap in it, and it is what every HACS user will actually exercise.
+Settings, Voice assistants, set the TTS engine to Deepgram, then talk to it. On
+<code>main</code> this exercises the batch path because streaming is off; that is still worth
+doing, because it proves the pipeline wiring independently of chapter 6.</li>
+<li><strong>Streaming through the Sonos audio clip path.</strong> Untested and genuinely
+unknown. <code>loadAudioClip</code> hands Sonos a <code>streamUrl</code> and Sonos fetches it
+itself. Whether it starts on the first bytes or waits for the whole clip decides whether
+streaming is audible at all through a Sonos. If it buffers, the first-frame number never
+reaches a listener and the demo needs different hardware.</li>
+<li><strong>The options flow.</strong> Change the voice, change the speed, confirm the entry
+reloads and the next call uses the new value. Unit tested only. Also confirm the speed slider
+does not offer off-grid values: the API rejects anything not on a 0.05 step.</li>
+<li><strong>Two entries side by side.</strong> One Flux for English, one Aura for Spanish.
+Confirm they get distinct entity ids with no <code>_2</code> suffix. Unit tested only, and it is
+the one design decision with no live evidence behind it.</li>
+</ol>
+</div>
+
+<h2>Step 5. Decide on chapter 6</h2>
+
+<div class="step">
+<p><code>chapter-6-streaming</code> is five commits ahead of main and adds streaming. It is
+written, it has 132 passing tests, and it has been exercised against the live API and through a
+real Home Assistant. It is <strong>not merged</strong>, on purpose.</p>
+
+<p><strong>Defining <code>async_stream_tts_audio</code> is itself the opt-in.</strong> Home
+Assistant detects streaming by comparing the class method against the base method. There is no
+flag. The moment that method exists, every Assist response in the house routes down the websocket
+while direct <code>tts.speak</code> calls keep working and hide any breakage. That is exactly how
+the community integration this replaces shipped broken.</p>
+
+<p>The merge is one command once step 4 items 1 and 2 pass:</p>
+
+<pre><code>git checkout main &amp;&amp; git merge chapter-6-streaming</code></pre>
+
+<p>What you get for it, measured rather than claimed: first audio in <strong>99 ms</strong> against
+a 73 ms network floor, versus <strong>3394 ms</strong> for batch to synthesize and transfer the
+whole clip. And one thing to know before writing about it: Flux emits on a <strong>sentence
+boundary</strong>, so a multi-sentence response starts speaking while the model is still
+generating, and a single-sentence one does not start until the text is complete.</p>
+</div>
+
+<h2>Step 6. The flip, which is the real HACS prerequisite</h2>
+
+<div class="gate">
+<h3>This is a decision, not a step</h3>
+<p><strong>HACS requires a public repository.</strong> This is a private lab repo, and by the
+convention in <code>~/LABS/CLAUDE.md</code> the flip to public is <strong>one way and
+terminal</strong>:</p>
+<ul>
+<li>History is rewritten into build order first, so the public commit log reads as a tutorial.
+The seven chapter structure was built to make that close to a no-op, but deciding the chapters is
+judgment, not tooling. Budget an hour.</li>
+<li><code>.hub/</code> and <code>advocacy/</code> are stripped from <strong>every</strong>
+commit, not just the tip. A <code>.gitignore</code> line does not do this.</li>
+<li>After the flip the public repo is the repo of record. The lab repo is never worked in again
+except to write content from its ledger, and is never deleted.</li>
+<li>Pull requests on the public repo are applied by hand here and arrive in a later snapshot.
+Nothing merges back.</li>
+</ul>
+<p>Flip target: <code>samgutentag-deepgram/ha-deepgram-tts</code>, which does not exist yet.
+<code>manifest.json</code> already points <code>documentation</code> and
+<code>issue_tracker</code> at it, so those URLs 404 until it does.
+<code>scripts/hacs_check.py</code> knows this and reports them as skips rather than failures
+until <code>hub.yml</code> gains a <code>public_repo</code> key.</p>
+<p><strong>Do not do this in a hurry.</strong> It is the one action in this project with no undo.</p>
+</div>
+
+<h2>Step 7. HACS, in two stages</h2>
+
+<div class="step">
+<h3>Stage one, which is fast: custom repository</h3>
+<p>The moment the public repo exists, anyone can install this by adding the URL to HACS as a
+custom repository of type <code>integration</code>. <strong>No review queue, no waiting.</strong>
+This is the "sooner rather than later" path and it is the one to aim at first.</p>
+<p>It needs a published GitHub <strong>release</strong>, not just a tag.
+<code>.github/workflows/release.yml</code> builds it and refuses when the tag disagrees with the
+<code>version</code> in <code>manifest.json</code>, which is <code>0.1.0</code> today.</p>
+
+<h3>Stage two, slower: the default store</h3>
+<p>A pull request to <code>hacs/default</code>, which is a review queue on someone else's repo.
+<code>docs/hacs-submission.md</code> has the full checklist. Current state from
+<code>scripts/hacs_check.py</code>: <strong>22 verified, 8 unverifiable from here, 0
+failures</strong>. All eight are GitHub side and unblock with the flip: public repo, description,
+topics, a published release, HACS having fetched it once, and the two Docker actions passing.</p>
+<p><strong>Brand assets are already done and not by us.</strong>
+<code>home-assistant/brands</code> has a <code>custom_integrations/deepgram_tts/</code> entry with
+all four PNGs and the CDN serves them. They key on the integration domain, not the repository, and
+ours matches the community integration's. That removes the only requirement needing an asset
+nobody had made, and it is a hard reason never to rename the domain.</p>
+</div>
+
+<h2>What is still genuinely unknown</h2>
+
+<table>
+<thead><tr><th>Unknown</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td>Everything about ARM and the Pi</td><td>No line of this has run on that hardware. Latency will be worse; correctness should not be</td></tr>
+<tr><td>Streaming through the Sonos audio clip path</td><td>If Sonos buffers the whole clip, streaming is inaudible through it and the demo needs other hardware</td></tr>
+<tr><td>A real Assist pipeline</td><td>The path every user takes, and the path with the trap</td></tr>
+<tr><td>Catalog fetch on a Pi over wifi</td><td>205 KB at every entry setup with a 15 second timeout. Fine on a laptop, unmeasured on a Pi</td></tr>
+<tr><td>Whether any playback device rejects a stream with no length</td><td>Sonos does not. ffmpeg does not. Nothing else has been asked</td></tr>
+<tr><td>hassfest and the HACS action</td><td>Both are Docker actions and there is no daemon here. <code>scripts/hacs_check.py</code> is a stand-in, not a substitute</td></tr>
+</tbody>
+</table>
+
+<h2>The shortest honest path</h2>
+
+<ol>
+<li>Copy to the Pi, restart, add the integration, hear it on the Beam. <span class="tag">one evening</span></li>
+<li>Work the four tests in step 4. <span class="tag">one evening</span></li>
+<li>Merge chapter 6 if items 1 and 2 passed. <span class="tag">one command</span></li>
+<li>Tag <code>v0.1.0</code> and let the release workflow build it. <span class="tag">minutes</span></li>
+<li>Do the flip, deliberately, with an hour set aside. <span class="tag">one sitting, no undo</span></li>
+<li>Install it on your own instance from HACS as a custom repository, to prove the distribution path on a clean install. <span class="tag">minutes</span></li>
+<li>Only then consider the <code>hacs/default</code> pull request.</li>
+</ol>
+
+<p>Steps 1 through 4 are reversible and cheap. Step 5 is not. Everything after it is waiting on
+other people.</p>
+
+<p class="meta">Every claim here is checkable against the repo. The build record is
+<code>.hub/ledger.md</code>, 63 entries. Facts that turned out wrong since the project started are
+in <code>docs/handoff-corrections.md</code>, ten of them, and <code>HANDOFF.md</code> was
+deliberately never edited so the starting assumptions stay visible. No latency figure in this
+document was measured on the Raspberry Pi.</p>
+<!-- ===== CONTENT END ===== -->
+
+<script>
+  /* ===== THEME SCRIPT — DO NOT EDIT (keep identical across all docs) ===== */
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    var stored = null;
+    try { stored = localStorage.getItem('doc-theme'); } catch (e) {}
+    var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemDark ? 'dark' : 'light');
+
+    function apply(t) {
+      root.setAttribute('data-theme', t);
+      btn.textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+    apply(theme);
+
+    btn.addEventListener('click', function () {
+      theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(theme);
+      try { localStorage.setItem('doc-theme', theme); } catch (e) {}
+    });
+  })();
+  /* ===== END THEME SCRIPT ===== */
+</script>
+
+</body>
+</html>
