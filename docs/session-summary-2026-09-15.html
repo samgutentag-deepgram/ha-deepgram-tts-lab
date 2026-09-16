@@ -201,29 +201,26 @@ over the real LAN address, twelve files, all byte-identical. The Asana project i
 tasks.</p>
 
 <div class="asknow">
-<h3>Four things left, and two of them are ten minutes</h3>
+<h3>It speaks. Three things left, and none of them is code.</h3>
+<p style="margin-top:0"><strong>With your key in <code>.env</code>, everything that could be
+verified without your Pi has been verified.</strong> A real Home Assistant 2026.9.2 ran on this
+Mac with the integration installed, the real config flow created a real entry, and it spoke
+out loud in all seven supported languages with the correct voice family for each.</p>
 <ol>
-<li><strong>Paste a Deepgram key into <code>.env</code>.</strong> <code>cp .env.sample .env</code>,
-fill in <code>DEEPGRAM_API_KEY</code>, then <code>set -a &amp;&amp; source .env &amp;&amp; set +a</code>.
-One key unblocks the first authenticated round trip, the open question about whether
-<code>speed</code> is range checked server side, and the latency measurement the streaming work
-is gated on. <span class="tag">10 min</span></li>
-<li><strong>Copy the integration to the Pi and restart it.</strong> Run
-<code>./scripts/serve_bundle.sh</code> and paste the one line it prints into the Studio Code
-Server terminal. Then Developer tools, YAML, Restart. The restart is not optional: Python that
-Home Assistant has already imported does not change without one.
+<li><strong>Order hardware.</strong> The only real blocker now. Two Voice Preview Edition pucks
+at $58.95 plus a $42.74 Creative Pebble V3, $163.14 total. Print
+<code>docs/hardware-bom.html</code>. <span class="tag">shipping time</span></li>
+<li><strong>Copy it to the Pi and restart.</strong> <code>./scripts/serve_bundle.sh</code>, paste
+the one line into Studio Code Server's terminal, then Developer tools, YAML, Restart.
 <span class="tag">10 min</span></li>
-<li><strong>Order hardware.</strong> Longest lead item, and everything visual waits on it. Two
-Voice Preview Edition pucks at $58.95 plus a $42.74 Creative Pebble V3, $163.14 total. Print
-<code>docs/hardware-bom.html</code> and shop from it. <span class="tag">shipping time</span></li>
 <li><strong>Move the Asana project into Developer Relations.</strong> It exists with all four
-tasks and a 2026-09-22 check-back date, but it landed with no team and no tool available here
-can set one. Open the project, three-dot menu, move to team. A second project was deliberately
-not created. <span class="tag">30 sec</span></li>
+tasks and a 2026-09-22 check-back. It landed with no team and no tool here can set one.
+<span class="tag">30 sec</span></li>
 </ol>
-<p style="margin-bottom:0"><strong>Not waiting on you:</strong> advocacy intake. That is gated
-on chapter 5 making a sound, not on a decision. Every input it needs is staged in
-<code>advocacy/prep/</code>.</p>
+<p style="margin-bottom:0"><strong>My one recommendation:</strong> merge chapter 6 after the
+first successful call on the Pi, not before. It is verified through a real Home Assistant here,
+but your own gate says real hardware and it costs you one command:
+<code>git merge chapter-6-streaming</code>.</p>
 </div>
 
 <h2>Where the code is</h2>
@@ -506,23 +503,62 @@ and one test every sentence has to pass.</p>
 <table>
 <thead><tr><th>Thing</th><th>Count</th></tr></thead>
 <tbody>
-<tr><td>Commits on <code>main</code></td><td class="num">45</td></tr>
-<tr><td>Tests passing on <code>main</code>, against real Home Assistant 2026.9.2</td><td class="num">120</td></tr>
-<tr><td>Tests passing on <code>chapter-6-streaming</code></td><td class="num">130</td></tr>
+<tr><td>Commits on <code>main</code></td><td class="num">50</td></tr>
+<tr><td>Tests passing on <code>main</code>, against real Home Assistant 2026.9.2</td><td class="num">122</td></tr>
+<tr><td>Tests passing on <code>chapter-6-streaming</code></td><td class="num">132</td></tr>
 <tr><td>Python lines across the integration, tests, and scripts</td><td class="num">~4,900</td></tr>
-<tr><td>Ledger entries</td><td class="num">48</td></tr>
-<tr><td>Handoff claims corrected</td><td class="num">6</td></tr>
+<tr><td>Ledger entries</td><td class="num">60</td></tr>
+<tr><td>Handoff claims corrected</td><td class="num">10</td></tr>
 <tr><td>Handoff claims re-verified against the installed Home Assistant</td><td class="num">36</td></tr>
 <tr><td>Confirmed defects found by the adversarial review, and fixed</td><td class="num">9</td></tr>
 <tr><td>Diagrams drawn</td><td class="num">20</td></tr>
 <tr><td>Agents run in parallel worktrees</td><td class="num">10</td></tr>
-<tr><td>Latency measurements taken</td><td class="num">0</td></tr>
+<tr><td>Languages spoken out loud, correct voice family each</td><td class="num">7</td></tr>
+<tr><td>First audio frame, real Home Assistant, this Mac</td><td class="num">99 ms</td></tr>
+<tr><td>Network round trip floor to api.deepgram.com</td><td class="num">73 ms</td></tr>
+<tr><td>Latency measurements taken on the Pi</td><td class="num">0</td></tr>
 </tbody>
 </table>
 
-<p>That last row is the honest summary of the whole session. Everything that could be built
-without a key and without hardware is built and verified. Nothing that needs either one has been
-touched, and no number has been invented to cover the gap.</p>
+<p>The last row is still the honest summary. Everything that could be verified without the Pi
+has been, and nothing has been measured on the hardware this will actually run on.</p>
+
+<h2>The finding to lead the blog post with</h2>
+
+<p><strong>Flux emits audio on a sentence boundary.</strong> The handoff called the server placing
+flush boundaries internally the single most important fact in the document, and it was right. It
+never said what the boundary is, and that decides what streaming is worth for any given turn.</p>
+
+<pre><code>three complete sentences, 1s apart
+  chunks sent at 0, 1001, 2003 ms; flush at 3003 ms
+  first audio frame at  112 ms  ->  2891 ms BEFORE the flush
+
+one sentence in three fragments, 1s apart
+  chunks sent at 0, 1001, 2002 ms; flush at 3002 ms
+  first audio frame at 3097 ms  ->    95 ms AFTER the flush</code></pre>
+
+<p>A terminator is the trigger. Give Flux a complete sentence and it starts generating in about
+110 to 160 ms. Give it a fragment and it waits, because there is nothing it can commit to.</p>
+
+<p>So the chapter 6 success criterion, that audio starts before the model finishes talking, is
+<strong>true for a multi-sentence response by 2.9 seconds</strong> and <strong>false for a
+single-sentence one</strong>, which is most of what a house says. Streaming still wins there for
+a different reason: 150 ms after the text is complete, against 3394 ms for batch to synthesize
+and transfer the whole clip on the same machine.</p>
+
+<p>It also corrected our own number. An earlier measurement said 314 ms and concluded Deepgram's
+"as low as 80 ms" was unreachable from a house. That harness fed one sentence as five chunks
+40 ms apart, so the whole feeding time sat inside the measurement. Fed the way Home Assistant
+actually feeds it, one complete message in one <code>Speak</code>, through a real Home Assistant:
+<strong>99 ms and 106 ms, against a measured 73 ms network floor.</strong> Roughly 26 ms of that
+is Deepgram. <strong>A latency harness that does not feed the API the way production feeds it
+measures the harness.</strong></p>
+
+<p>And the same measurement exposed our own test as optimistic. <code>FakeSocket</code> answers
+every <code>Speak</code> with audio regardless of sentence structure, so the test asserting audio
+arrives before the text runs out would pass against an implementation reality contradicts. That
+is the exact failure the skeptic pass had named two hours earlier, found this time by measuring
+the real server rather than by reading the test.</p>
 
 <h2>Where to go next</h2>
 
