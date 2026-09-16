@@ -861,3 +861,66 @@ It is the closest thing to the Pi that exists without the Pi, and it is explicit
 not: no latency number from it belongs to the Pi, and it tests no playback device.
 Source: scripts/local_ha.sh · `./scripts/local_ha.sh`, `--stop` to tear down
 Routes to: the README, and the "how do I check this myself" section of the technical post
+
+### [surprise] A merge conflict inside a docstring is valid Python, so the tests passed
+Expected: conflict markers in a `.py` file to be a syntax error, which is the cheap safety net
+that stops an unresolved merge from being committed.
+Actual: `git merge` left `<<<<<<< HEAD`, `=======` and `>>>>>>> main` inside a triple-quoted
+docstring, where they are just characters. The module imported, `ruff` had no complaint, and all
+132 tests passed with the conflict sitting in the file.
+Nothing broke and nothing would have, since it was only a docstring. The point is that the
+reflex, "if it were unresolved the tests would fail", is not true when the conflict lands inside
+a string literal, and docstrings are exactly where two branches both explaining the same new
+method will collide.
+The reliable check is `git status` and `grep -rn '<<<<<<<'`, not a green suite.
+Source: custom_components/deepgram_tts/api.py `stream()` docstring · commit d562a6a
+Routes to: a gotchas post
+
+### [claim] Flux emits on a sentence boundary, which is the fact under the whole streaming design
+HANDOFF section 3.5 calls the server placing flush boundaries internally the single most
+important fact in the document, and it is right. It never says what the boundary **is**, and the
+answer decides what streaming is worth for any given turn.
+Measured with chunks fed a full second apart so the timing cannot be misread:
+```
+three complete sentences, 1s apart  -> first audio at  112 ms, 2891 ms BEFORE the flush
+one sentence in three fragments     -> first audio at 3097 ms,   95 ms AFTER the flush
+```
+**A sentence terminator is the trigger.** Give Flux a complete sentence and it starts generating
+in about 110 to 160 ms. Give it a fragment and it waits, because there is nothing it can commit
+to. Confirmed from the other side: feeding one sentence as five chunks at 0, 100, 300 and 600 ms
+gaps, the gap between the last chunk and the first frame is constant at 147 to 158 ms.
+It held, and it settles section 6.1's chapter 6 criterion. "The first audio frame arrives before
+the LLM has finished its sentence" is **true for a multi-sentence response**, by 2.9 seconds. It
+is **false for a single-sentence one**, which is most of what a home assistant says, and there
+streaming still wins by a mile for a different reason: 150 ms after the text is complete instead
+of 3394 ms for batch to synthesize and transfer the whole clip.
+Source: docs/handoff-corrections.md C10 · measured through the real FluxSocket
+Routes to: technical blog post, and this is the section the post should open with
+
+### [correction] The 314 ms first-frame number was measuring the harness, not the API
+An earlier entry and correction C9 reported a 314 ms median first frame and concluded that
+Deepgram's "as low as 80 ms" was not reproducible from a house. Both were artifacts of the
+measurement: the harness feeds one sentence as five chunks 40 ms apart, and since Flux waits for
+a sentence boundary, the whole 200 ms of feeding time lands inside the number.
+Fed the way Home Assistant actually feeds it, one complete message in a single Speak, through a
+real Home Assistant on this Mac: **first frame 99 ms and 106 ms.** Against a measured 73 ms
+network round trip floor, that is roughly 26 ms of Deepgram.
+So the marketing figure is approximately reachable and the difference is transit from this
+house. Did not hold as originally stated, and the reason is worth more than the number: a
+latency harness that does not feed the API the way production feeds it measures the harness.
+Source: docs/handoff-corrections.md C10 · local Home Assistant log, chapter-6-streaming branch
+Routes to: technical blog post, and it replaces the number in every draft
+
+### [friction] Our own fake socket is optimistic, in exactly the way the review warned about
+`test_audio_arrives_before_the_text_runs_out` asserts the first audio frame lands before the last
+chunk is sent, and it passes. Its `FakeSocket` answers **every** `Speak` with audio, whether or
+not the text is a complete sentence. Real Flux does not.
+So for a single-sentence turn the fake is optimistic, and the assertion would hold against an
+implementation that reality contradicts. That is the exact failure mode the skeptic pass named
+two hours earlier: a fixture that makes the right and wrong behaviors produce the same answer.
+Found by measuring the real server, not by reading the test.
+Kept rather than rewritten, with an honest docstring. The fake still proves the client interleaves
+sending and receiving instead of serializing them, which is the property the file exists to pin.
+What it does not prove is now written down in it.
+Source: tests/test_stream.py · docs/handoff-corrections.md C10
+Routes to: technical blog post, the testing section

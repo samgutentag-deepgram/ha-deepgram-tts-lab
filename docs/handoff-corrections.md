@@ -391,3 +391,88 @@ All figures are in `scripts/out/live-stream-*.json` and `scripts/out/first-frame
 hardware recorded in each file. **None of this is the Pi.** A Raspberry Pi on wifi will be
 slower, and the ffmpeg conversion C5 describes is a subprocess spawn that is not in these numbers
 because they do not go through Home Assistant.
+
+---
+
+## C10. Flux emits on a sentence boundary. The handoff was right, and it never said why.
+
+**Established 2026-09-16.** Qualifies section 3.5 and settles the chapter 6 criterion in 6.1.
+
+Section 3.5 says the server places flush boundaries internally, so stream tokens straight in and
+do not split sentences. That is correct. What it does not say is **what the boundary is**, and
+the answer changes what streaming is worth for a given response.
+
+Measured through the real `FluxSocket`, feeding chunks a full second apart so the timing is
+unambiguous:
+
+```
+three complete sentences, 1s apart
+  chunks sent at 0, 1001, 2003 ms; flush at 3003 ms
+  first audio frame at 112 ms  ->  2891 ms BEFORE the flush
+
+one sentence in three fragments, 1s apart
+  chunks sent at 0, 1001, 2002 ms; flush at 3002 ms
+  first audio frame at 3097 ms  ->  95 ms AFTER the flush
+```
+
+**A complete sentence is the trigger.** Give Flux a sentence terminator and it starts generating
+immediately, roughly 110 to 160 ms later. Give it a fragment and it waits, because it has nothing
+it can commit to. Either way the round trip after the boundary is ~150 ms.
+
+Confirmed from the other direction. Feeding one sentence as five chunks at varying rates, the gap
+between the last chunk and the first frame is constant:
+
+```
+feed gap     last chunk sent    first frame    difference
+     0 ms               0 ms         147 ms        147 ms
+   100 ms             505 ms         657 ms        152 ms
+   300 ms            1505 ms        1662 ms        157 ms
+   600 ms            3005 ms        3163 ms        158 ms
+```
+
+### What this settles, and what it costs
+
+**Section 6.1's chapter 6 criterion is met.** "The first audio frame arrives before the LLM has
+finished its sentence" is true for a multi-sentence response, by 2.9 seconds in the measurement
+above. That criterion is now measured rather than hoped for.
+
+**And it is not met for a single-sentence response.** A one-sentence answer, which is most of
+what a home assistant says, gets its first audio ~150 ms after the response is complete. That is
+still far better than batch, because batch returns nothing until the whole clip is synthesized
+and transferred, 3394 ms on the same machine and network. But the story is not "audio starts
+while the model is still talking" for those turns. It is "audio starts 150 ms after the text
+does, instead of three and a half seconds after."
+
+### The test that was passing for the wrong reason
+
+`tests/test_stream.py::test_audio_arrives_before_the_text_runs_out` asserts the first frame lands
+before the last chunk is sent. It passes, and its `FakeSocket` answers **every** `Speak` with
+audio regardless of whether the text is a complete sentence. Real Flux does not.
+
+So for a single-sentence turn the fake is optimistic and the assertion would hold against an
+implementation reality contradicts. This is precisely the failure the skeptic pass named: a
+fixture that makes the right and wrong behaviors produce the same answer. It was found here by
+measuring the real server, not by reading the test.
+
+The fake is not wrong to keep: it still proves the client interleaves sending and receiving
+rather than serializing them, which is the property the file exists to pin. What changed is that
+the docstring now says what it does not prove.
+
+### And the corrected headline number
+
+C9 reported a 314 ms median first frame and treated the 80 ms marketing figure as unreachable.
+Both were an artifact of the harness feeding one sentence in five chunks 40 ms apart, which adds
+the whole feeding time to the measurement.
+
+Fed the way Home Assistant actually feeds it, one complete message in a single `Speak`, through
+a real Home Assistant on this Mac:
+
+```
+Flux socket turn: first frame  99 ms, complete 2312 ms, 180480 bytes, 1 chunks
+Flux socket turn: first frame 106 ms, complete 3028 ms, 238080 bytes, 1 chunks
+```
+
+**99 ms, against a 73 ms network round trip floor.** So roughly 26 ms of that is Deepgram. The
+"as low as 80 ms" claim is approximately reachable and the remaining difference is the transit
+from this house. C9's conclusion that it was not reproducible was measuring the harness, not the
+API, and this supersedes it.
