@@ -943,3 +943,47 @@ may buffer the whole clip**. And the objection to measuring latency through a sm
 stands: measure on the host, demo on the Beam.
 Source: SSDP `urn:schemas-upnp-org:device:ZonePlayer:1` probe · http://192.168.1.138:1400/xml/device_description.xml · docs/hardware-bom.html correction block
 Routes to: the buy decision, and the user-facing blog post, where "use the speakers you already own" is a better opening than a shopping list
+
+### [claim] Flux speaks through a Sonos Beam, with no new hardware, and the DLNA worry did not bite
+Tested live on 2026-09-16 against Sam's own Sonos Beam (S14, 192.168.1.138), at volume 10 because
+it was night, with the original volume of 24 read first and restored afterward.
+Home Assistant auto-discovered the Beam over SSDP during boot, with no configuration: the Sonos
+config flow aborted `single_instance_allowed` because discovery had already created the entry.
+`tts.speak` with `media_player_entity_id` pointed at it works.
+**The size worry from the hardware research did not bite.** `docs/hardware-bom.html` flagged that
+the TTS proxy is a chunked response with no `Content-Length`, and that core carries a HEAD
+handler for DLNA renderers that want a size first. Playing the proxy URL directly on the Beam:
+`TRANSITIONING` then `PLAYING` with `dur=0:00:00`, the position advancing normally. **Sonos plays
+a stream whose length it does not know.**
+Source: soco 0.31.2 against 192.168.1.138 · local Home Assistant log
+Routes to: the buy decision, the user-facing blog post, docs/hardware-bom.html
+
+### [friction] tts.speak on Sonos looked broken and was not, because the check was wrong
+Symptom: `tts.speak` targeting the Beam returned HTTP 200, logged no error at all, and the Beam
+sat at `STOPPED` for twelve seconds of polling. It read as a silent failure, and the natural next
+step was to start debugging the integration.
+Cause: **Home Assistant's Sonos integration plays announcements as an audio clip overlay, not as
+a track.** With the sonos logger raised at runtime, the actual line is
+`Playing http://.../api/tts_proxy/....mp3 using websocket audioclip`, sending `loadAudioClip` over
+the Sonos websocket. An audio clip never touches transport state, so
+`get_current_transport_info()` reports `STOPPED` throughout while the speaker is talking.
+Fix: none needed in our code. The check was wrong. Verify a Sonos announcement from the
+integration's debug log, never from transport state.
+Two other things this run cleared up, both mine rather than the code's. A 500 from
+`media_player.play_media` was a malformed media-source URI I wrote by hand, `Provider
+deepgram_tts not found`, because that path keys on the **entity id** and not the domain. And the
+clip Sam heard through his laptop speakers mid-test was `scripts/local_ha.sh` ending with
+`afplay`, which is worth a warning line in the script since it makes noise on the host.
+Source: local Home Assistant log with homeassistant.components.sonos at debug
+Routes to: the real-hardware checklist, and a gotchas post
+
+### [decision] Still untested: chapter 6 streaming through the Sonos audio clip path
+The batch path is proven on the Beam. Streaming is not, and the audio clip API is a different
+path from a normal track, so the earlier result does not carry over.
+The specific question: `loadAudioClip` hands Sonos a `streamUrl` and Sonos fetches it itself.
+Whether it begins playback on the first bytes or waits for the whole clip is unknown, and if it
+waits, streaming through Sonos buys nothing and the first-frame number never reaches a listener.
+Not tested tonight on purpose: it needs the `chapter-6-streaming` branch deployed and more noise
+in the house at 21:30. It is the first thing to try when chapter 6 goes to the Pi.
+Source: sonos_websocket `loadAudioClip` command, from the debug log
+Routes to: the chapter 6 merge checklist
