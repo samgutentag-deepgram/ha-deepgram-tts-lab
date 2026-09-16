@@ -216,6 +216,17 @@ class DeepgramTTSEntity(TextToSpeechEntity):
 
         speed = options.get(CONF_SPEED) if voice.is_flux else None
 
+        # Same line the batch path logs, for the same reason: on a real instance the model
+        # actually sent is the only thing worth checking, and the streaming path had no
+        # equivalent, so a hand-check of an Assist response saw nothing at all.
+        _LOGGER.debug(
+            "Streaming as %s (%s) for language %s, speed=%s",
+            voice.voice_id,
+            voice.family,
+            request.language,
+            speed,
+        )
+
         if not voice.is_flux:
             # Aura has no socket at all. Settled decision 5: fall back to batch rather than
             # refuse, so a Spanish pipeline still speaks.
