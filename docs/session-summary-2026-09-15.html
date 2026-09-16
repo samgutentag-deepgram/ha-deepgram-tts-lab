@@ -191,26 +191,39 @@ synthesizes. It has never spoken out loud, because there is no Deepgram API key 
 and there is no speaker in your house. Those are the two things that stand between this and a
 demo, and neither is a code problem.</p>
 
+<p><strong>Updated after your answers.</strong> Your Pi was probed rather than taken on trust:
+<code>homeassistant.local</code> is 192.168.1.197, port 8123 answers and the REST API returns
+401 so it only wants a token, and ports 22, 22222, 445 and 139 are all refused. There is no SSH
+and no Samba, so <code>deploy.sh</code> had nowhere to connect. The Pi can still reach this
+laptop, which is what <code>scripts/serve_bundle.sh</code> uses: it serves the integration for
+one download and prints the single line to paste into the Studio Code Server terminal. Verified
+over the real LAN address, twelve files, all byte-identical. The Asana project is live with four
+tasks.</p>
+
 <div class="asknow">
-<h3>Five things only you can do</h3>
+<h3>Four things left, and two of them are ten minutes</h3>
 <ol>
-<li><strong>Put a Deepgram API key in the environment.</strong> One key unblocks three separate
-things, including the only number the whole campaign rests on.</li>
-<li><strong>Order hardware.</strong> Longest lead item in the project, and it is the first thing
-to start because everything visual waits on it. The recommendation is two Voice Preview Edition
-pucks at $58.95 each plus a $42.74 powered speaker. Full bill of materials in
-<code>docs/hardware-bom.html</code>.</li>
-<li><strong>Answer three questions about your Home Assistant instance:</strong> install type,
-hostname, and which apps are installed. Listed verbatim in <code>docs/deploy-notes.md</code>.
-Thirty seconds to answer, an hour to guess wrong.</li>
-<li><strong>Say go on the Asana project.</strong> <code>project-hub init</code> creates a team
-visible project plus four tasks, one of which needs a check-back date only you can pick. It was
-not worth guessing while you were out. Everything else in <code>.hub/</code> is done and works
-without it.</li>
-<li><strong>Nothing on advocacy intake.</strong> That is not waiting on a decision, it is waiting
-on chapter 5 making a sound. Every fact, angle, outline, draft and script is staged in
-<code>advocacy/prep/</code> so intake is a short job instead of a cold start.</li>
+<li><strong>Paste a Deepgram key into <code>.env</code>.</strong> <code>cp .env.sample .env</code>,
+fill in <code>DEEPGRAM_API_KEY</code>, then <code>set -a &amp;&amp; source .env &amp;&amp; set +a</code>.
+One key unblocks the first authenticated round trip, the open question about whether
+<code>speed</code> is range checked server side, and the latency measurement the streaming work
+is gated on. <span class="tag">10 min</span></li>
+<li><strong>Copy the integration to the Pi and restart it.</strong> Run
+<code>./scripts/serve_bundle.sh</code> and paste the one line it prints into the Studio Code
+Server terminal. Then Developer tools, YAML, Restart. The restart is not optional: Python that
+Home Assistant has already imported does not change without one.
+<span class="tag">10 min</span></li>
+<li><strong>Order hardware.</strong> Longest lead item, and everything visual waits on it. Two
+Voice Preview Edition pucks at $58.95 plus a $42.74 Creative Pebble V3, $163.14 total. Print
+<code>docs/hardware-bom.html</code> and shop from it. <span class="tag">shipping time</span></li>
+<li><strong>Move the Asana project into Developer Relations.</strong> It exists with all four
+tasks and a 2026-09-22 check-back date, but it landed with no team and no tool available here
+can set one. Open the project, three-dot menu, move to team. A second project was deliberately
+not created. <span class="tag">30 sec</span></li>
 </ol>
+<p style="margin-bottom:0"><strong>Not waiting on you:</strong> advocacy intake. That is gated
+on chapter 5 making a sound, not on a decision. Every input it needs is staged in
+<code>advocacy/prep/</code>.</p>
 </div>
 
 <h2>Where the code is</h2>
@@ -493,7 +506,7 @@ and one test every sentence has to pass.</p>
 <table>
 <thead><tr><th>Thing</th><th>Count</th></tr></thead>
 <tbody>
-<tr><td>Commits on <code>main</code></td><td class="num">42</td></tr>
+<tr><td>Commits on <code>main</code></td><td class="num">45</td></tr>
 <tr><td>Tests passing on <code>main</code>, against real Home Assistant 2026.9.2</td><td class="num">120</td></tr>
 <tr><td>Tests passing on <code>chapter-6-streaming</code></td><td class="num">130</td></tr>
 <tr><td>Python lines across the integration, tests, and scripts</td><td class="num">~4,900</td></tr>
