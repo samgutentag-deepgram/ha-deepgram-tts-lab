@@ -20,5 +20,6 @@ scripts/out/
 # agent worktrees. real git worktrees, never content
 .claude/worktrees/
 
-# deploy target config for scripts/deploy.sh and scripts/tail_ha_log.sh (host, token)
+# secrets and deploy target config. .env.sample is committed, .env is not.
+.env
 scripts/.ha-deploy.env

@@ -91,6 +91,63 @@ first tag happens.
 
 ---
 
+## Answered 2026-09-16, and probed rather than taken on trust
+
+Sam answered these, and every network claim below was verified from this laptop on the same
+evening. The probe matters: two of his answers were about which apps are installed, and what
+actually decides the transport is which ports are open.
+
+| Question | Answer | How it was checked |
+| --- | --- | --- |
+| Install type | Home Assistant OS on a Raspberry Pi with an NVMe drive | Stated, and consistent with the apps store being present |
+| Hostname | `homeassistant.local`, resolving to `192.168.1.197` | `ping` |
+| UI port | 8123, answering | `curl` returned HTTP 200 on `/` and 401 on `/api/` |
+| Apps installed | File Editor, Studio Code Server, Zigbee2MQTT, MQTT, and others | Stated |
+| SSH available | **No.** Port 22 refused | `nc -z homeassistant.local 22` |
+| Host shell available | **No.** Port 22222 refused | `nc -z homeassistant.local 22222` |
+| Samba available | **No.** Ports 445 and 139 refused | `nc -z` on both |
+| `rsync` on the far side | Unknown and not yet relevant, since there is no ssh to run it over | |
+
+**So `deploy.sh` has nowhere to connect, and that is the whole finding.** File Editor and
+Studio Code Server are browser based. They can create a file, and they cannot receive one from
+this laptop. `HA_DEPLOY_TRANSPORT` is deliberately left empty in `.env.sample` so the script
+refuses rather than guesses.
+
+### The chosen path: `scripts/serve_bundle.sh`
+
+Sam chose manual copy over installing an app. Hand-copying twelve files into a browser editor is
+the bad version of that, so the script makes it two commands instead.
+
+The Pi can reach this laptop, which is the fact the whole approach rests on. So: tar the
+integration here, serve it on one port for one download with `python3 -m http.server`, and pull
+it from **Studio Code Server's built-in terminal**, which has a shell with access to `/config`.
+
+Verified end to end on 2026-09-16 over this laptop's real LAN address: the archive contains
+exactly the twelve shipped files, and all twelve extract byte-identical to source. The only
+difference from the source tree is `__pycache__`, excluded on purpose.
+
+Two things the script does deliberately:
+
+- It refuses to bundle when `manifest.json` is missing from the source directory, the same guard
+  `deploy.sh` has, so a wrong path cannot produce a tarball of the wrong tree.
+- It shuts the server down after the download or the timeout, so nothing is left listening on
+  the LAN.
+
+The one thing it cannot do is restart Home Assistant, because a restart needs either the API
+token or a click in the UI. **A restart is not optional.** Python that Home Assistant has
+already imported does not change without one, so a copied file does nothing until the process
+restarts.
+
+### What would change if the SSH app gets installed later
+
+One word. `HA_DEPLOY_TRANSPORT=rsync` in `.env`. Every other value in `.env.sample` is already
+filled in correctly for that path: host, user `root`, port 22, and `/config`. `serve_bundle.sh`
+stays useful for a one-off on a machine with no key set up.
+
+The argument for eventually installing it is loop speed, and it is not small: every code change
+needs a full Home Assistant restart regardless, so the copy step is the only part that can be
+made instant.
+
 ## Open questions the tooling does not answer
 
 1. **Whether `reload_config_entry` is ever useful here.** It re-runs `async_setup_entry` against

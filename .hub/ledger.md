@@ -720,3 +720,74 @@ it would have been a claim a reader could falsify in four lines.
 `chapter-6-streaming` 130.
 Source: docs/review/skeptic-pass-2026-09-15.md · custom_components/deepgram_tts/catalog.py `resolve_voice`
 Routes to: the blog draft, which needs that sentence rewritten before it goes anywhere
+
+## 2026-09-16
+
+### [friction] The Asana project exists and is in no team, and two tasks landed in My Tasks
+Symptom: a created project came back with `team: null` and `privacy_setting: private`, and the
+first two tasks came back with `projects: []` and permalinks pointing at a different project id
+entirely, which turned out to be Sam's My Tasks list.
+Cause, two separate parameter-name mistakes made by guessing instead of reading the schema.
+`asana_create_project` takes **`team`**, not `team_gid`, so the team argument was silently
+ignored rather than rejected. `asana_create_task` takes **`project_id`**, a single string, not
+`projects`, an array.
+Fix: deleted both orphaned tasks and recreated all four with `project_id`. Verified by reading
+each one back rather than trusting the create response: all four now report the project in
+their `memberships`.
+**Not fixed, and it cannot be from here.** `update_project` has no `team` field and there is no
+delete-project tool, so the project cannot be moved into Developer Relations and cannot be
+recreated without leaving a duplicate behind. A second project was deliberately not created,
+because a silent second project is how a repo ends up with two. One manual move in the Asana UI
+fixes it.
+The lesson is narrower than "read the docs": **an API that silently ignores an unknown argument
+instead of rejecting it turns a typo into a wrong-looking success.** The create call returned
+HTTP 200 with a complete project object. Only reading the `team` field back showed the problem,
+which is exactly the reason the project-hub skill insists on reporting partial failures by name.
+Source: .hub/hub.yml, the asana block and the note under it · https://app.asana.com/1/411927538413705/project/1218530151668605
+Routes to: one manual move in Asana, and a gotchas post about write APIs that ignore unknown fields
+
+### [surprise] The apps that are installed are not the ones that matter, and the ports said so
+Sam answered that the instance is Home Assistant OS on a Pi with an NVMe drive, on
+`homeassistant.local`, with File Editor, Studio Code Server, Zigbee2MQTT and MQTT installed.
+That reads like a well equipped instance. Then the probe: `homeassistant.local` resolves to
+192.168.1.197, port 8123 answers with HTTP 200 and `/api/` answers 401, and ports **22, 22222,
+445 and 139 are all refused.**
+So there is no SSH, no host shell, and no Samba. File Editor and Studio Code Server are browser
+based: they can create a file and they cannot receive one from a laptop. `deploy.sh` had nowhere
+to connect, and the recommendation the deployment research landed on, rsync over ssh, was
+unavailable on the actual machine.
+Worth recording because the question that was asked was "which apps are installed" and the
+question that decides the answer is "which ports are open." Asking a person to enumerate their
+add-ons gets you a list of what they use; four `nc` calls get you what you can actually do.
+Source: docs/deploy-notes.md, the answered table · `nc -z homeassistant.local` on 22, 22222, 445, 139
+Routes to: the real-hardware checklist, technical blog post
+
+### [decision] Serve the bundle over HTTP instead of installing an add-on
+Sam chose manual copy over installing the Advanced SSH and Web Terminal app. Hand-copying twelve
+files into a browser editor is the bad version of that, so what lost was leaving it at that, and
+what was chosen was making manual copy two commands.
+The fact the whole approach rests on: **the Pi can reach this laptop**, even though the laptop
+cannot reach the Pi on any file transfer port. So `scripts/serve_bundle.sh` tars the integration,
+serves it on one port with `python3 -m http.server` for one download, and prints the single line
+to paste into Studio Code Server's built-in terminal, which has a shell with access to
+`/config`.
+Cost: a 20 KB tarball and a server that shuts itself down after the download or a timeout.
+Verified end to end over the real LAN address rather than over loopback, which would have proved
+nothing: twelve files in the archive, all twelve byte-identical after extraction, and the only
+difference from the source tree is `__pycache__`, excluded on purpose.
+What it cannot do is restart Home Assistant, and that is not optional. Python that is already
+imported does not change without a restart, so a copied file does nothing on its own.
+Source: scripts/serve_bundle.sh · docs/deploy-notes.md
+Routes to: user-facing blog post, since anyone on HA OS with no SSH has this same problem
+
+### [asset] .env.sample, with the instance's real values already filled in
+`.env.sample` at the repo root, copied to a gitignored `.env`. One file for everything: both
+shell scripts now fall back to it, and the Python scripts read the environment after
+`set -a && source .env && set +a`.
+`HA_DEPLOY_TRANSPORT` is deliberately left **empty** rather than set to `rsync`, because the
+port probe says rsync has nowhere to connect and a script that refuses beats a script that
+guesses. Every other value is already correct for the rsync path, so if the SSH app ever gets
+installed it is a one word change.
+`HA_DEPLOY_LOG_SOURCE` is `api` rather than `ssh` for the same reason.
+Source: .env.sample · .gitignore
+Routes to: the README's install section

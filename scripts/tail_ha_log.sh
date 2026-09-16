@@ -10,7 +10,8 @@
 #
 # Same scheme as deploy.sh, same env file, so one file configures both.
 #
-#   HA_DEPLOY_ENV_FILE       Path to the env file. Default: scripts/.ha-deploy.env
+#   HA_DEPLOY_ENV_FILE       Path to the env file. Default: .env at the repo root,
+#                            or scripts/.ha-deploy.env when that exists.
 #
 # Required:
 #
@@ -70,7 +71,15 @@ say() {
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
-ENV_FILE="${HA_DEPLOY_ENV_FILE:-$SCRIPT_DIR/.ha-deploy.env}"
+# One env file for the whole repo. scripts/.ha-deploy.env still wins if it exists,
+# so an older setup keeps working, but .env at the repo root is the documented one.
+if [ -n "${HA_DEPLOY_ENV_FILE:-}" ]; then
+  ENV_FILE="$HA_DEPLOY_ENV_FILE"
+elif [ -f "$SCRIPT_DIR/.ha-deploy.env" ]; then
+  ENV_FILE="$SCRIPT_DIR/.ha-deploy.env"
+else
+  ENV_FILE="$SCRIPT_DIR/../.env"
+fi
 if [ -f "$ENV_FILE" ]; then
   set -a
   # shellcheck source=/dev/null
