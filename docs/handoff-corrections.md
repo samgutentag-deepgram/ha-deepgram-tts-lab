@@ -251,3 +251,143 @@ it. So the socket opens and characters are billed even if nobody ever listens. A
 audio is never cached or deduplicated: `store_to_disk=False`, keyed on a ULID. Batch audio is
 cached; streamed audio is not. At $0.045 per 1,000 characters that is a real difference in a
 house that asks the same question every morning.
+
+---
+
+## C7. The open questions in section 7 are closed. Three answers, one of them a bug.
+
+**Established 2026-09-16, with a real API key.** Closes section 7 items 1 and 3, and settles the
+`speed` half of C2.
+
+### Section 7 item 1: the first authenticated round trip. PASSES.
+
+```
+flux  /v2/speak flux-haley-en:    HTTP 200, audio/mpeg, 19584 bytes, 2.10s, first4=ff f3 64 c4
+aura  /v1/speak aura-2-thalia-en: HTTP 200, audio/mpeg, 17136 bytes, 1.40s, first4=ff f3 64 c4
+```
+
+`ffprobe` on both: `mp3`, 24000 Hz, mono, 48 kbps. So the undocumented default output of both
+endpoints is 24 kHz mono mp3 at 48 kbps, and `0xFFF3` is a real MPEG frame sync rather than a
+container we guessed at.
+
+### Section 3.4's `speed` range is real after all, and C2 needs this qualifier.
+
+C2 said the 0.5 to 1.5 range in 0.05 increments was docs-sourced because probing returned 401.
+With a real key it validates, and the error messages are explicit:
+
+```
+speed=1.37 -> 400  "'speed' must be provided in increments of 0.05."
+speed=3.0  -> 400  "'speed' must be between 0.5 and 1.5."
+speed=0.1  -> 400  "'speed' must be between 0.5 and 1.5."
+speed=1.15 -> 200
+```
+
+So the **values** in section 3.4 are correct. What was wrong is only the claim that they were
+established by pre-auth probing. Range checks run after auth; schema checks run before it. The
+options flow's 0.05 slider step is right, and off-grid values are rejected rather than rounded.
+
+### A real bug: `sample_rate` is rejected with no encoding at all.
+
+```
+sample_rate=24000, no encoding -> 400 UNSUPPORTED_AUDIO_FORMAT
+  "Unsupported audio format: `sample_rate` is not applicable when `encoding=mp3`."
+```
+
+mp3 is the default, so omitting `encoding` is the same as asking for mp3. Chapter 2 followed the
+interface contract literally and dropped `sample_rate` only for an **explicit** `encoding=mp3`,
+which left a request the API rejects reachable through the default. This was recorded in the
+ledger as a deliberate decision to follow the contract rather than guess, and the guess would
+have been right. Fixed in `_build_params`, with two tests.
+
+### Section 7 item 3: `/v1/speak` does accept a `text/plain` body. Answered.
+
+`Content-Type: text/plain` with a raw body returns HTTP 200 and audio. This only ever affected
+the Aura path and this integration always sends JSON, so nothing changes. The question is closed.
+
+### And the formats the streaming path depends on, confirmed over batch
+
+```
+encoding=linear16&container=wav&sample_rate=24000  -> 200  audio/wav          RIFF
+encoding=linear16&sample_rate=24000                -> 200  audio/wav          RIFF
+encoding=linear16&container=none&sample_rate=16000 -> 200  audio/l16;rate=16000  raw
+encoding=linear16&container=wav&sample_rate=48000  -> 200  audio/wav          RIFF
+```
+
+`container` defaults to `wav` for `linear16`. Both 16000 and 48000 are accepted, which matters
+because the two playback paths the hardware research found want exactly those: 16 kHz for an
+ESPHome satellite with the speaker flag, 48 kHz for a Voice Preview Edition fetching the proxy
+URL itself. And `audio/l16;rate=16000` carries a parameter on the content type, which
+`_extension_for` already handles by splitting on `;`.
+
+---
+
+## C8. The Flux socket really does emit 24 kHz, and the WAV header is correct.
+
+**Established 2026-09-16.** Closes the largest open risk in chapter 6.
+
+`stream.py` asks the socket for `encoding=linear16&sample_rate=24000` and prepends a WAV header
+declaring 24 kHz. Nothing in the protocol confirms the rate, so that header was an assertion.
+
+Six live turns through the real `FluxSocket`, with the rate computed from bytes received against
+the `audio_duration_ms` the server reported:
+
+```
+implied sample rate across runs: [24000]
+MATCHES the 24000 Hz in the WAV header. Playback pitch is correct.
+ffprobe on the result: pcm_s16le, 24000 Hz, 1 channel, 6.24 s
+```
+
+So the header is right, ffmpeg decodes what we produce, and the self-check in
+`_check_sample_rate` stayed quiet for the right reason rather than because it is broken. The
+tightened 0.95 tolerance from the skeptic pass did not produce a false positive on real audio.
+
+## C9. First-frame latency, measured. The 80 ms figure is not reproducible from a house.
+
+**Established 2026-09-16.** Closes section 7 item 2, which said the figure was unmeasured and
+that Deepgram's "as low as 80 ms" was a claim to test rather than a fact to repeat.
+
+Measured on a MacBook, arm64, over wifi, twice with two independent harnesses that agree:
+
+```
+                            median      min      max      p95
+socket connect to Connected    96 ms    86 ms   146 ms   146 ms
+first Speak to first audio    314 ms   285 ms   332 ms   332 ms
+first Speak to SpeechMetadata 3927 ms
+```
+
+The network floor on this path is not small and has to be subtracted before the number means
+anything:
+
+```
+ping api.deepgram.com   min/avg/max 71.99 / 72.93 / 76.25 ms
+TCP connect             ~75 ms
+TLS established         ~160 ms
+```
+
+**So 73 ms of the 314 ms is one round trip that no implementation can avoid.** An 80 ms
+time-to-first-audio is barely above that floor, which means it must be measured from inside
+Deepgram's network or with the transit excluded. It is not reachable from a house on this coast,
+and it should not be repeated as though it were.
+
+**The defensible claim is the comparison, not the absolute.** Same machine, same network, same
+text, same voice:
+
+```
+streaming, first audio frame   median  314 ms
+batch, whole clip returned            3394 ms
+                                      10.8x faster to first sound
+```
+
+And the property that actually decides whether streaming is worth building:
+
+```
+realtime factor   median 1.56x
+```
+
+Audio arrives 1.56 times faster than it plays, so a player that starts on the first frame never
+starves. Below 1.0 the whole design would be pointless. This is the number to lead with.
+
+All figures are in `scripts/out/live-stream-*.json` and `scripts/out/first-frame-*.json` with the
+hardware recorded in each file. **None of this is the Pi.** A Raspberry Pi on wifi will be
+slower, and the ffmpeg conversion C5 describes is a subprocess spawn that is not in these numbers
+because they do not go through Home Assistant.

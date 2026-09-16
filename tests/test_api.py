@@ -291,3 +291,43 @@ async def test_verify_key_raises_request_error_otherwise(
 
     with pytest.raises(DeepgramRequestError):
         await client.async_verify_key()
+
+
+async def test_sample_rate_is_dropped_when_no_encoding_is_given(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """mp3 is the default, so no encoding means mp3, and mp3 plus sample_rate is a 400.
+
+    Verified against the live API on 2026-09-16: `sample_rate=24000` with no `encoding` returns
+    400 UNSUPPORTED_AUDIO_FORMAT, "`sample_rate` is not applicable when `encoding=mp3`". Chapter
+    2 read the interface contract literally and dropped it only for an explicit `encoding=mp3`,
+    which left a request the API rejects reachable through the default.
+    """
+    aioclient_mock.post(URL_SPEAK_FLUX, content=b"audio", headers={"Content-Type": "audio/mpeg"})
+    client = DeepgramClient(async_get_clientsession(hass), "key")
+
+    await client.async_synthesize("hi", model=DEFAULT_VOICE, sample_rate=24000)
+
+    query = aioclient_mock.mock_calls[-1][1].query
+    assert "sample_rate" not in query
+    assert "encoding" not in query
+
+
+async def test_sample_rate_survives_an_encoding_that_accepts_it(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """linear16 does take a sample_rate, so dropping it there would break the streaming path.
+
+    Verified live: encoding=linear16 with sample_rate 16000, 24000 and 48000 all return 200,
+    and with container=wav the body starts with RIFF.
+    """
+    aioclient_mock.post(URL_SPEAK_FLUX, content=b"RIFF", headers={"Content-Type": "audio/wav"})
+    client = DeepgramClient(async_get_clientsession(hass), "key")
+
+    await client.async_synthesize(
+        "hi", model=DEFAULT_VOICE, encoding="linear16", container="wav", sample_rate=48000
+    )
+
+    query = aioclient_mock.mock_calls[-1][1].query
+    assert query["sample_rate"] == "48000"
+    assert query["encoding"] == "linear16"

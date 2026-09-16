@@ -39,6 +39,7 @@ from .errors import (
     DeepgramRequestError,
 )
 from .models import family_for_model
+from .stream import FluxSocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,10 +110,24 @@ class DeepgramClient:
     def __init__(self, session: ClientSession, api_key: str) -> None:
         """Store the shared Home Assistant session and the key to authenticate with."""
         self._session = session
+        self._api_key = api_key
         self._headers = {
             "Authorization": f"Token {api_key}",
             "Content-Type": "application/json",
         }
+
+    def stream(self, *, model: str, speed: float | None = None) -> FluxSocket:
+        """Open one streaming turn against the Flux socket.
+
+        Inert on main for the same reason `stream.py` is: Home Assistant only routes down the
+        streaming path when the entity defines `async_stream_tts_audio`, and nothing here does.
+        This exists so `scripts/live_stream_check.py` can exercise the real socket client
+        against the real API without the entity opting in, which is what the review asked for.
+
+        The client hands back a socket rather than exposing the API key, so the key stays in the
+        one object that owns it.
+        """
+        return FluxSocket(self._session, self._api_key, model=model, speed=speed)
 
     async def async_verify_key(self) -> None:
         """Round trip a one-word synthesis and discard the audio.
@@ -198,9 +213,15 @@ def _build_params(
         params["container"] = container
 
     if sample_rate is not None:
-        if encoding == ENCODING_MP3:
+        # Dropped for an explicit mp3 AND for no encoding at all, because mp3 is the default.
+        # Verified live 2026-09-16: sample_rate with no encoding returns
+        # 400 UNSUPPORTED_AUDIO_FORMAT, "`sample_rate` is not applicable when `encoding=mp3`".
+        # Chapter 2 followed the interface contract literally and only dropped it for the
+        # explicit case, which left a request the API rejects reachable through the default.
+        if encoding in (None, ENCODING_MP3):
             _LOGGER.debug(
-                "Dropping sample_rate=%s: the API rejects it as not applicable to mp3",
+                "Dropping sample_rate=%s: not applicable to mp3, which is the default when no "
+                "encoding is given",
                 sample_rate,
             )
         else:
