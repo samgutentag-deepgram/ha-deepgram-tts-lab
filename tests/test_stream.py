@@ -201,7 +201,19 @@ async def test_sends_one_speak_per_chunk_then_flush_and_never_splits_text():
 
 
 async def test_audio_arrives_before_the_text_runs_out():
-    """The first frame must land before the last chunk is sent, or streaming bought nothing."""
+    """The client must interleave sending and receiving rather than serializing them.
+
+    What this does NOT prove, measured against the real API on 2026-09-16: that audio always
+    arrives before the text runs out. Flux emits on a **sentence boundary**, so a single
+    sentence fed in fragments produces no audio until the flush, and the first frame lands
+    about 150 ms after the last chunk rather than before it. See docs/handoff-corrections.md
+    C10. `FakeSocket` answers every Speak with audio regardless of sentence structure, which is
+    optimistic in exactly that case.
+
+    It is kept anyway, and the assertion is still worth pinning: an implementation that sent
+    every chunk before reading anything would fail it, and that implementation deletes the
+    benefit of streaming for the multi-sentence responses where the benefit is real.
+    """
     session = FakeSession()
     socket = FluxSocket(session, "key", model=DEFAULT_VOICE)
     sent_at_first_frame: list[int] = []

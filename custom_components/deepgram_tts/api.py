@@ -119,10 +119,11 @@ class DeepgramClient:
     def stream(self, *, model: str, speed: float | None = None) -> FluxSocket:
         """Open one streaming turn against the Flux socket.
 
-        Inert on main for the same reason `stream.py` is: Home Assistant only routes down the
-        streaming path when the entity defines `async_stream_tts_audio`, and nothing here does.
-        This exists so `scripts/live_stream_check.py` can exercise the real socket client
-        against the real API without the entity opting in, which is what the review asked for.
+        On this branch the entity does define `async_stream_tts_audio`, so this is the live
+        path for every Assist response. On main the same method exists and is inert, because
+        Home Assistant only routes down the streaming path when the entity overrides that
+        method, and there it does not. `scripts/live_stream_check.py` uses this either way, to
+        exercise the real socket client against the real API without the entity opting in.
 
         The client hands back a socket rather than exposing the API key, so the key stays in the
         one object that owns it.
