@@ -1080,3 +1080,27 @@ Worth fixing in the skill: either write the reference sections outside the TILES
 `--tiles` strip anything from the first `Reference:` heading down.
 Source: .claude/skills/project-hub/scripts/regenerate.py · 69 tiles before, 50 after
 Routes to: a fix in the project-hub skill, and a gotchas post about round-tripping generated files
+
+### [decision] Promoted to a campaign. Day 0 is 2026-10-08 and the claim is frozen
+`advocacy-intake` ran. The Asana project went from an exploration to a campaign, which in this
+model is nothing but dates: `start_on` 2026-10-08, `due_on` 2027-01-06. An undated project is an
+exploration and a dated one is a campaign, and there is no status field to flip.
+**The frozen claim**, in `advocacy/advocacy.md` and not editable again even if the work changes:
+defining `async_stream_tts_audio` is itself Home Assistant's streaming opt-in, there is no flag,
+so a TTS integration that implements streaming before measuring a first-frame number ships a
+voice assistant that fails inside Assist while direct `tts.speak` calls keep working and hide it.
+Two ways it could turn out false, which is the test a claim has to pass: Home Assistant could
+detect streaming support some other way, or an unmeasured streaming implementation could work
+fine in Assist. Neither is true today and both are checkable.
+**Four surfaces kept**: personal blog, corporate blog, and a thread off each. **Video deferred**,
+because `.hub/assets/` holds audio and logs and no footage, and the shot the slate rests on is a
+person talking to the assistant, which needs the Voice PE. **LinkedIn declined** on both
+branches: the Home Assistant community is in forums, Reddit and GitHub, and a LinkedIn post about
+a custom integration reaches recruiters instead of installers.
+Six tasks filed across three new sections, dependencies wired, `Decide: promote or drop` closed.
+Gates C and D are deliberately unfiled; `advocacy-cycle` files those on its first run, so a board
+that stops at Gate B is the expected shape and not an incomplete one.
+Also corrected: the three exploration tasks carried notes claiming 120 tests, chapter 6 unmerged,
+and three blockers that have all cleared. Rewritten to match.
+Source: advocacy/advocacy.md · https://app.asana.com/1/411927538413705/project/1218530151668605
+Routes to: advocacy-cycle, and the campaign itself
