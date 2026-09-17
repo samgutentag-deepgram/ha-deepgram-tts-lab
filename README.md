@@ -1,13 +1,24 @@
 # Deepgram TTS for Home Assistant
 
+> ## 🚧 Work in progress. Not released, not supported, do not install this yet.
+>
+> This repository is an active build, not a product. No tag, no GitHub release, not in the
+> HACS default store, and no support of any kind. Several things listed below have never been
+> run once. Everything here is accurate as of **2026-09-17** and goes stale fast.
+>
+> Read [Where this actually is](#where-this-actually-is) first. It is the whole reason this
+> README is worth reading, and it lists what has never been tried as plainly as what works.
+
 A Home Assistant custom integration that makes [Deepgram Flux TTS](https://developers.deepgram.com)
 the voice of a Home Assistant voice assistant. Flux is the primary path and the default voice.
 [Aura-2](https://developers.deepgram.com) is supported as a second family, because every Flux
 voice is English and Aura-2 is the only way to serve a non-English Assist pipeline.
 
-Not released yet. No tag, no GitHub release, and not in the HACS default store. Read
-[Where this actually is](#where-this-actually-is) before you install it, because that section is
-the whole reason this README is worth reading.
+This picks up the work started in
+[`alceasan/ha-deepgram-tts`](https://github.com/alceasan/ha-deepgram-tts), which proved a
+Deepgram TTS entity was worth having. It is a rebuild rather than a git fork, so there is no
+shared history, but that integration's config flow shape is what this one's is modeled on and
+its limits are what most of the new work here is aimed at. See [Credits](#credits).
 
 ## What you need
 
@@ -20,6 +31,10 @@ public and take no auth at all, which is why the voice picker can show you all 1
 step right after the key step and why a bad key fails at the key step rather than at the picker.
 
 ## Install
+
+Not yet, really. This repository is private and there is no release, so these steps are here to
+show the shape of the install rather than to be followed. HACS can add a private repository as a
+custom repository only if you have given it a GitHub token with access.
 
 1. In HACS, open the three-dot menu, choose **Custom repositories**, paste this repository's URL,
    and pick **Integration** as the category.
@@ -110,31 +125,65 @@ it without a second integration.
 
 ## Where this actually is
 
-No release, no tag, not in the HACS default store. What is true today:
+No release, no tag, not in the HACS default store. Verified 2026-09-17.
 
-- **Batch synthesis is the path this integration uses.** One `async_synthesize` method routes on
-  the model prefix: `flux-*` to `POST /v2/speak`, everything else to `POST /v1/speak`. Posting an
-  Aura model to `/v2/speak` is rejected by the API, so the prefix is the only routing signal
-  there is.
-- **Streaming is written and not enabled.** `stream.py` is a complete Flux websocket client with
-  unit tests against a fake socket, and nothing calls it. In Home Assistant, overriding
+### What works
+
+- **It speaks.** A real Home Assistant 2026.9.2 ran with the integration installed, the real
+  config flow created a real entry against a real API key, and it spoke in all seven supported
+  languages with the correct voice family each time. Then it played through a Sonos Beam in a
+  living room. That is a speaker in a house making a sound, not a passing test.
+- **122 tests pass on `main`**, 0 failures, ruff clean. The suite runs against real Home
+  Assistant 2026.9.2 with `pytest-homeassistant-custom-component`, not against a mock of Home
+  Assistant.
+- **Batch synthesis is the path `main` uses.** One `async_synthesize` method routes on the model
+  prefix: `flux-*` to `POST /v2/speak`, everything else to `POST /v1/speak`. Posting an Aura
+  model to `/v2/speak` is rejected by the API, so the prefix is the only routing signal there is.
+- **Streaming is written, measured, and deliberately not merged.** It lives on
+  `chapter-6-streaming`, five commits ahead, 132 tests passing. In Home Assistant, overriding
   `async_stream_tts_audio` **is** the opt-in for streaming, there is no flag, and the moment the
-  method exists every Assist pipeline response routes down it while direct `tts.speak` calls keep
-  working. So the method stays absent until `scripts/measure_first_frame.py` has produced a
-  first-frame number on real hardware. That is exactly how the integration this one replaces
-  shipped broken.
-- **No authenticated request has ever run.** There was no Deepgram API key on the machine this
-  was built on, so every path past Deepgram's auth check is verified against mocks and not against
-  the API. The unauthenticated half is verified live: both catalogs were re-fetched and the counts
-  held.
-- **Nothing has run on real hardware yet.** The test suite runs against real Home Assistant
-  2026.9.2 with `pytest-homeassistant-custom-component`, not against a mock of Home Assistant, and
-  77 tests pass. That is not the same as a speaker in a kitchen making a sound, and it is not
-  claimed to be.
+  method exists every Assist pipeline response routes down it while direct `tts.speak` calls
+  keep working. It stays on the branch until the first two items below have been tried. That is
+  exactly how the integration this one picks up from shipped broken.
 
-No latency number appears anywhere in this repository, including this README, because none has
-been measured. Deepgram's marketing claims first audio in as low as 80ms; treat that as a claim to
-test and not as a number this integration has hit.
+### What has never been tried
+
+The honest half, in priority order:
+
+1. **A real Assist pipeline, end to end.** Only `tts.speak` and `tts_get_url` have been
+   exercised. Assist uses the streaming path, which is the one with the trap, and it is what
+   every real user hits first.
+2. **Streaming through the Sonos audio clip path.** Sonos is handed a `streamUrl` and fetches it
+   itself. If it buffers the whole clip before playing, streaming is inaudible through a Sonos
+   and the entire chapter-6 branch buys nothing on that speaker.
+3. **The options flow, live.** Change voice, change speed, confirm the entry reloads. Unit
+   tested only.
+4. **Two entries side by side**, one Flux and one Aura. Unit tested only.
+5. **Anything at all on a Raspberry Pi.** Every number in this README is from a MacBook.
+
+## Latency, measured
+
+Measured on a MacBook, arm64, over wifi, twice with two independent harnesses that agree.
+**None of this is a Raspberry Pi** and none of it goes through Home Assistant, so the ffmpeg
+conversion Home Assistant needs is not included.
+
+| | median |
+| --- | --- |
+| socket connect to `Connected` | 96 ms |
+| first `Speak` to first audio frame | 314 ms |
+| batch, whole clip returned | 3394 ms |
+
+Two numbers worth taking from that, and one worth ignoring:
+
+- **Streaming reaches first sound 10.8x faster than batch**, same machine, same network, same
+  text, same voice. The comparison is the defensible claim, not the absolute.
+- **Realtime factor is 1.56x.** Audio arrives 1.56 times faster than it plays, so a player that
+  starts on the first frame never starves. Below 1.0 the streaming design would be pointless.
+  This is the number that decides whether streaming is worth building at all.
+- **Ignore "as low as 80 ms".** A ping to `api.deepgram.com` from here is 72 ms, so 73 ms of the
+  314 ms is one round trip that no implementation can avoid. An 80 ms time-to-first-audio is
+  barely above that floor, which means it has to be measured from inside Deepgram's network. It
+  is not reachable from a house on this coast and should not be repeated as though it were.
 
 ## What it costs
 
@@ -182,10 +231,13 @@ Any resolved model starting with `flux-` on a non-English request is a bug worth
 
 ## Credits
 
-[`alceasan/ha-deepgram-tts`](https://github.com/alceasan/ha-deepgram-tts) is the prior art. This
-is a fresh build rather than a fork, but that integration is what proved a Deepgram TTS entity was
-worth having, and its config flow shape is what this one's is modeled on. Thanks for doing it
-first.
+[`alceasan/ha-deepgram-tts`](https://github.com/alceasan/ha-deepgram-tts) is the prior art this
+work picks up from. It is a rebuild rather than a git fork, so the two share no commits, but that
+integration is what proved a Deepgram TTS entity was worth having and its config flow shape is
+what this one's is modeled on. The new work here is Flux as the primary path, a merged 138-voice
+catalog, per-request language resolution across two model families, typed auth and connection
+errors that a caller can actually tell apart, and a streaming client held back until it is
+measured. Thanks for doing it first.
 
 Deepgram's [Flux TTS](https://developers.deepgram.com) and
 [Aura-2](https://developers.deepgram.com) do the actual speaking.
