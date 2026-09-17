@@ -91,11 +91,14 @@
 
 <p class="eyebrow"><span class="dg">deepgram</span> &middot; home assistant custom integration &middot; project hub</p>
 <h1>Deepgram Flux TTS for Home Assistant &middot; Project Hub</h1>
-<p class="lede">A Home Assistant custom integration that makes Deepgram Flux TTS the voice of a Home Assistant voice assistant. Chapters 1 to 5 are on main and tested against real Home Assistant 2026.9.2. Chapter 6 is written and held on a branch. Start at the handoff, then the build plan.</p>
+<p class="lede">&gt;-</p>
+
+<!-- BOARD LINK START -->
 <a class="board-link" href="https://app.asana.com/1/411927538413705/project/1218530151668605" target="_blank" rel="noopener">
   <span class="k">Tracked in Asana</span>
   <span class="v">Deepgram Flux TTS for Home Assistant</span>
 </a>
+<!-- BOARD LINK END -->
 
 <div class="tiles">
 <!-- TILES START -->
@@ -121,10 +124,10 @@
 
 <h2>The integration</h2>
 <div class="grid">
-  <a class="tile" href="../custom_components/deepgram_tts/"><span class="name">🧩 custom_components/deepgram_tts</span><span class="desc">Chapters 1 to 5 on main. api, catalog, config_flow, tts, and the socket client.</span> <span class="path">custom_components/deepgram_tts/</span></a>
-  <a class="tile" href="../README.md"><span class="name">📄 README</span><span class="desc">The front door. What it is, how to install it, and what does not work yet.</span> <span class="path">README.md</span></a>
+  <a class="tile" href="../custom_components/deepgram_tts/"><span class="name">🧩 custom_components/deepgram_tts</span><span class="desc">Chapters 1 to 6 on main. api, catalog, config_flow, tts, and the socket client.</span> <span class="path">custom_components/deepgram_tts/</span></a>
+  <a class="tile" href="../README.md"><span class="name">📄 README</span><span class="desc">Cut to 870 words and de-slopped 2026-09-17. Flux first, Aura as a subsection, three sections dropped.</span> <span class="path">README.md</span></a>
   <a class="tile" href="../CHANGELOG.md"><span class="name">📋 Changelog</span><span class="desc">Unreleased only, which is correct: there has been no release and no tag.</span> <span class="path">CHANGELOG.md</span></a>
-  <a class="tile" href="../tests/"><span class="name">✅ Tests</span><span class="desc">99 on main against real Home Assistant 2026.9.2. 108 on the chapter 6 branch.</span> <span class="path">tests/</span></a>
+  <a class="tile" href="../tests/"><span class="name">✅ Tests</span><span class="desc">132 on main against real Home Assistant 2026.9.2, ruff clean. The chapter 6 streaming tests are in this number.</span> <span class="path">tests/</span></a>
   <a class="tile" href="../docs/ha-2026.9-verification.md"><span class="name">🔬 HA 2026.9.2 fact check</span><span class="desc">36 handoff claims checked against the installed source. 27 confirmed, 6 different, 3 absent.</span> <span class="path">docs/ha-2026.9-verification.md</span></a>
   <a class="tile" href="../docs/hacs-submission.md"><span class="name">📦 HACS submission checklist</span><span class="desc">What is satisfied and what is blocked on the flip to public. Nobody has made an icon yet.</span> <span class="path">docs/hacs-submission.md</span></a>
 </div>
@@ -135,32 +138,34 @@
   <a class="tile" href="../docs/chapter-3-notes.md"><span class="name">3️⃣ Voice catalog</span><span class="desc">138 voices merged. display_name is null on 61 of 102 Aura entries.</span> <span class="path">docs/chapter-3-notes.md</span></a>
   <a class="tile" href="../docs/chapter-4-notes.md"><span class="name">4️⃣ Config flow</span><span class="desc">One dropdown for 138 voices, and why the fallback label collides.</span> <span class="path">docs/chapter-4-notes.md</span></a>
   <a class="tile" href="../docs/chapter-5-notes.md"><span class="name">5️⃣ TTS entity, batch</span><span class="desc">Plus the hand-check list for the real instance. Ten items.</span> <span class="path">docs/chapter-5-notes.md</span></a>
-  <a class="tile pending" href="../docs/chapter-6-notes.md"><span class="name">6️⃣ TTS entity, streaming</span><span class="desc">On the chapter-6-streaming branch, not merged. Held on a measured latency number.</span> <span class="path">docs/chapter-6-notes.md</span></a>
+  <a class="tile" href="../docs/chapter-6-notes.md"><span class="name">6️⃣ TTS entity, streaming</span><span class="desc">Merged to main 2026-09-17 with its own gate unmet. Defining the method is the opt-in, so Assist streams now.</span> <span class="path">docs/chapter-6-notes.md</span></a>
   <a class="tile" href="../docs/chapter-7-notes.md"><span class="name">7️⃣ Harden</span><span class="desc">README, changelog, licence, and the HACS path. No tag yet, on purpose.</span> <span class="path">docs/chapter-7-notes.md</span></a>
 </div>
 
 <h2>Run it</h2>
 <div class="grid">
-  <a class="tile" href="../scripts/live_check.py"><span class="name">🔑 live_check.py</span><span class="desc">Chapter 2's verification in one command. Needs a DEEPGRAM_API_KEY, which this machine does not have.</span> <span class="path">scripts/live_check.py</span></a>
-  <a class="tile" href="../scripts/measure_first_frame.py"><span class="name">⏱️ measure_first_frame.py</span><span class="desc">The campaign's only real number. Median and p95, on the hardware, with the hardware named.</span> <span class="path">scripts/measure_first_frame.py</span></a>
-  <a class="tile" href="../scripts/deploy.sh"><span class="name">🚚 deploy.sh</span><span class="desc">rsync over ssh or a local copy. Refuses to run without a manifest at the source.</span> <span class="path">scripts/deploy.sh</span></a>
+  <a class="tile" href="../scripts/live_check.py"><span class="name">🔑 live_check.py</span><span class="desc">Chapter 2's verification in one command. A real key has now been run against both speak endpoints.</span> <span class="path">scripts/live_check.py</span></a>
+  <a class="tile" href="../scripts/measure_first_frame.py"><span class="name">⏱️ measure_first_frame.py</span><span class="desc">Median 314 ms to first audio against 3394 ms for batch, realtime factor 1.56x. MacBook over wifi, never a Pi.</span> <span class="path">scripts/measure_first_frame.py</span></a>
+  <a class="tile" href="../scripts/deploy.sh"><span class="name">🚚 deploy.sh</span><span class="desc">rsync over ssh or a local copy. The real instance has no SSH, so serve_bundle.sh is the path there.</span> <span class="path">scripts/deploy.sh</span></a>
+  <a class="tile" href="../scripts/serve_bundle.sh"><span class="name">📦 serve_bundle.sh</span><span class="desc">Copy to an instance with no SSH and no Samba. This is the path to the real Pi.</span> <span class="path">scripts/serve_bundle.sh</span></a>
   <a class="tile" href="../scripts/manifest_check.py"><span class="name">🛡️ manifest_check.py</span><span class="desc">The local stand-in for hassfest. Fails if an undeclared third-party import ever creeps back in.</span> <span class="path">scripts/manifest_check.py</span></a>
 </div>
 
 <h2>Capture</h2>
 <div class="grid">
-  <a class="tile" href="ledger.md"><span class="name">📓 Build ledger</span><span class="desc">Append-only. Thirty-one entries. Decisions, friction, dead ends, surprises, claims. The story source.</span> <span class="path">.hub/ledger.md</span></a>
-  <a class="tile" href="capture-plan.md"><span class="name">🎥 Capture plan</span><span class="desc">Three one-time events, none of which has happened. The second one is the whole campaign.</span> <span class="path">.hub/capture-plan.md</span></a>
-  <a class="tile local" href="assets/"><span class="name">📸 Captured assets</span><span class="desc">Empty. Nothing has been captured because nothing has run against a real key or real hardware.</span> <span class="path">.hub/assets/</span></a>
+  <a class="tile" href="ledger.md"><span class="name">📓 Build ledger</span><span class="desc">Append-only. 70 entries. Decisions, friction, dead ends, surprises, claims. The story source.</span> <span class="path">.hub/ledger.md</span></a>
+  <a class="tile" href="capture-plan.md"><span class="name">🎥 Capture plan</span><span class="desc">Three one-time events. The first two have happened and are captured in assets. The third needs the Voice PE.</span> <span class="path">.hub/capture-plan.md</span></a>
+  <a class="tile" href="assets/"><span class="name">📸 Captured assets</span><span class="desc">Six files. Both first-sound clips, the first authenticated round trip, the latency JSON, and two live logs.</span> <span class="path">.hub/assets/</span></a>
 </div>
 
 <h2>Campaign, staged</h2>
 <div class="grid">
-  <a class="tile" href="../advocacy/prep/README.md"><span class="name">📁 advocacy/prep</span><span class="desc">Nothing here has passed a gate. Read this first for what unblocks intake.</span> <span class="path">advocacy/prep/README.md</span></a>
+  <a class="tile" href="../advocacy/prep/README.md"><span class="name">📁 advocacy/prep</span><span class="desc">Intake is unblocked as of 2026-09-17. Still no frozen claim and no advocacy.md.</span> <span class="path">advocacy/prep/README.md</span></a>
+  <a class="tile" href="../advocacy/prep/status-2026-09-17.md"><span class="name">🔄 Prep status</span><span class="desc">All three intake blockers cleared. Read before the rest: names what is stale in each prep file.</span> <span class="path">advocacy/prep/status-2026-09-17.md</span></a>
   <a class="tile" href="../advocacy/prep/notes.md"><span class="name">🗃️ Fact sheet</span><span class="desc">70 facts across 11 themes, each tagged live, source, vendor, or inferred. The only thing content may project from.</span> <span class="path">advocacy/prep/notes.md</span></a>
-  <a class="tile" href="../advocacy/prep/angles.md"><span class="name">🎯 Angles, ranked</span><span class="desc">Seven, with the unsupported ones named. The top one needs no hardware.</span> <span class="path">advocacy/prep/angles.md</span></a>
-  <a class="tile" href="../advocacy/prep/blog-technical-draft.md"><span class="name">✍️ Technical draft</span><span class="desc">Full draft, de-slopped, every unverified claim marked inline. No latency number anywhere.</span> <span class="path">advocacy/prep/blog-technical-draft.md</span></a>
-  <a class="tile" href="../advocacy/prep/video-plan.md"><span class="name">🎬 Video slate</span><span class="desc">Six videos, three formats, blockers named per video. One is shootable this week.</span> <span class="path">advocacy/prep/video-plan.md</span></a>
+  <a class="tile" href="../advocacy/prep/angles.md"><span class="name">🎯 Angles, ranked</span><span class="desc">Seven ranked. A5 is supported now and A7 moved from impossible to early. See prep status.</span> <span class="path">advocacy/prep/angles.md</span></a>
+  <a class="tile" href="../advocacy/prep/blog-technical-draft.md"><span class="name">✍️ Technical draft</span><span class="desc">Full draft, de-slopped, every unverified claim marked inline. Predates the measured latency, so it needs a pass.</span> <span class="path">advocacy/prep/blog-technical-draft.md</span></a>
+  <a class="tile" href="../advocacy/prep/video-plan.md"><span class="name">🎬 Video slate</span><span class="desc">Six videos, three formats. The slate assumes no speaker, which is now wrong and needs redrawing.</span> <span class="path">advocacy/prep/video-plan.md</span></a>
   <a class="tile" href="../advocacy/prep/scripts/"><span class="name">📜 Four scripts</span><span class="desc">Same facts, four style contracts: technical, build-it-too, fun, user-demo.</span> <span class="path">advocacy/prep/scripts/</span></a>
 </div>
 
@@ -169,7 +174,7 @@
   <a class="tile ext" href="https://developers.deepgram.com/docs/flux-tts" target="_blank" rel="noopener"><span class="name">📘 Flux TTS docs</span><span class="desc">The websocket and batch endpoints this integration targets. Docs are thinner than HANDOFF section 3.</span></a>
   <a class="tile ext" href="https://api.deepgram.com/v2/models" target="_blank" rel="noopener"><span class="name">🎙️ Voice catalog, Flux</span><span class="desc">Public, no auth. 36 voices, all English, all architecture flux-tts.</span></a>
   <a class="tile ext" href="https://api.deepgram.com/v1/models" target="_blank" rel="noopener"><span class="name">🎙️ Voice catalog, Aura</span><span class="desc">Public, no auth. 102 TTS entries, 90 aura-2 plus 12 legacy aura. Zero Flux.</span></a>
-  <a class="tile ext" href="https://console.deepgram.com" target="_blank" rel="noopener"><span class="name">🔑 Deepgram console</span><span class="desc">Where the API key comes from. There is no key on this machine yet.</span></a>
+  <a class="tile ext" href="https://console.deepgram.com" target="_blank" rel="noopener"><span class="name">🔑 Deepgram console</span><span class="desc">Where the API key comes from. A real key has been used against both speak endpoints.</span></a>
 </div>
 
 <h2>Reference: Home Assistant</h2>
@@ -180,15 +185,19 @@
   <a class="tile ext" href="https://www.home-assistant.io/voice-pe/" target="_blank" rel="noopener"><span class="name">🔊 Voice Preview Edition</span><span class="desc">The reference voice hardware. See the bill of materials for whether it is the right buy.</span></a>
 </div>
 
+<h2>Reference: This project</h2>
+<div class="grid">
+  <a class="tile ext" href="https://github.com/samgutentag-deepgram/ha-deepgram-tts-lab" target="_blank" rel="noopener"><span class="name">📁 ha-deepgram-tts-lab on GitHub</span><span class="desc">Public since 2026-09-17, ledger and advocacy drafts included. Not the flipped snapshot.</span></a>
+</div>
+
 <h2>Reference: Prior art</h2>
 <div class="grid">
   <a class="tile ext" href="https://github.com/alceasan/ha-deepgram-tts" target="_blank" rel="noopener"><span class="name">🔀 alceasan/ha-deepgram-tts</span><span class="desc">The community integration this replaces. Credited, not forked. Its defects are HANDOFF section 2.2.</span></a>
 </div>
-
 <!-- TILES END -->
 </div>
 
-<p class="stamp foot">Generated 2026-09-15. Pending tiles do not exist yet; local only resolves on this machine. Derived from the repo and .hub/hub.yml: never hand edited, regenerate instead. Progress and status are not on this page, by design.</p>
+<p class="stamp foot">Generated unknown date. Pending tiles do not exist yet; local only resolves on this machine.</p>
 
 <script>
   (function () {

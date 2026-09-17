@@ -987,3 +987,96 @@ Not tested tonight on purpose: it needs the `chapter-6-streaming` branch deploye
 in the house at 21:30. It is the first thing to try when chapter 6 goes to the Pi.
 Source: sonos_websocket `loadAudioClip` command, from the debug log
 Routes to: the chapter 6 merge checklist
+
+---
+
+## 2026-09-17
+
+### [decision] The repo went to GitHub, and the lab convention was suspended on purpose
+54 commits had existed on one disk with no remote since the build started. Pushed to
+`samgutentag-deepgram/ha-deepgram-tts-lab`, created private first.
+The convention says a `-lab` repo stays private and only a stripped, history-rewritten snapshot
+goes public. Sam flipped this one to public by hand anyway, with `.hub/` and `advocacy/` still
+tracked, because sharing internally is easier from a public URL and the real flip waits until the
+thing is installable. Recorded here rather than argued: the decision was made with the contents
+named out loud, including the 989-line ledger and the unpublished blog drafts and video plans in
+`advocacy/prep/`.
+What this costs, so nobody rediscovers it later: the strip is no longer available cheaply. These
+files are in 20 commits and will stay in the public history until someone rewrites it, and a
+GitHub repo that has been public cannot be un-published by going private again.
+What it does not cost: `.env` was never committed, verified against the full history before the
+first push. No key has ever been on GitHub.
+Source: `git log --all --oneline -- .hub advocacy` 20 commits · https://github.com/samgutentag-deepgram/ha-deepgram-tts-lab
+Routes to: the build-log post, where "I broke my own rule and here is the bill" is the honest version
+
+### [decision] Chapter 6 merged with its own gate unmet
+`chapter-6-streaming` merged into `main` as 38c3e29. 132 tests passing, ruff clean.
+The gate written when the branch was held was: merge only after a real Assist pipeline end to end
+and the Sonos audio clip path have both been tried. **Neither has been tried.** Merged anyway, on
+Sam's call, so the work is visible internally now that the repo is public and so the Voice PE
+arrives to a `main` that already carries the path it will exercise.
+What this actually turns on: defining `async_stream_tts_audio` is itself Home Assistant's
+streaming opt-in, there is no flag, so every Assist pipeline response now routes down the
+websocket. Direct `tts.speak` calls keep using the batch path, which is the half that has been
+heard out loud through the Beam.
+The risk is unchanged and now lives on `main` instead of a branch: if Sonos `loadAudioClip`
+buffers the whole clip before playing, streaming through the Beam buys nothing.
+Source: 38c3e29 · custom_components/deepgram_tts/tts.py:197 · 132 passing
+Routes to: the technical blog post, and the first test when the Voice PE arrives
+
+### [decision] The README was cut to Flux and de-slopped, 2302 words to 870
+Three sections dropped outright: "Where this actually is", "Latency, measured", and "When it goes
+wrong". The work-in-progress banner carries the honesty those were doing, in a few lines instead
+of eighty. Restructured around the 36 Flux voices, with Aura demoted to a subsection for
+non-English pipelines.
+Sam flagged the header "The voices, honestly" as an AI tell on a first scroll, and he was right:
+the hedge was doing a section title's job. The de-slop pass on what survived took DiGiorno
+constructs 12 to 3, "worth ~ing" hedges 7 to 0, "rather than" 11 to 0, flat openers 6 to 0, and
+contractions 13 to 18.
+The one thing the cut costs: the README no longer states that 132 tests pass, which was the
+strongest progress signal for an internal reader.
+Source: README.md e6ed308 · de-slop skill counts before and after
+Routes to: the writing-process post, and a note in the de-slop skill that a section header can be the loudest tell in a file
+
+### [decision] Buying the Voice PE, and nothing else
+Sam is ordering the Home Assistant Voice Preview Edition. This is the buy the 2026-09-16 bill of
+materials correction pointed at: output is already solved by the Sonos Beam he owns, so the only
+open hardware question was the microphone, and the Voice PE is the microphone.
+It unblocks the top open item. A real Assist pipeline end to end has never been run, Assist is
+what uses the streaming path that just landed on `main`, and until now there was nothing in the
+house to talk to.
+Source: docs/hardware-bom.html correction block · the 2026-09-16 [correction] entry above
+Routes to: the buy decision, and the user-facing blog post
+
+### [decision] Every advocacy intake blocker is cleared, and the prep material is stale in named ways
+`advocacy/prep/README.md` said intake was blocked on three things: chapter 5 on real Home
+Assistant hardware, a `DEEPGRAM_API_KEY` this repo had never had, and a speaker Sam did not own.
+All three cleared between 2026-09-15 and 2026-09-16. `advocacy-intake` can run.
+Recorded as a correction layer in `advocacy/prep/status-2026-09-17.md` rather than by editing the
+prep files, matching how `docs/handoff-corrections.md` sits over `HANDOFF.md`. The prep material
+is the record of what was believed when it was written, and it stays that way.
+Two angles moved. **A5, flush boundaries**, was ranked 6 with "the best story in the project and
+currently unsupported, do not write it yet." C10 supports it now, so write it. **A7, the
+user-facing pitch**, was "cannot be written, there is no product to install." There is one, so A7
+moves from impossible to early.
+The video slate needs redrawing: it marks five of six videos blocked on a speaker and one
+shootable this week, and the speaker exists. What is still blocked is the microphone, which is a
+smaller set of shots than the slate assumes.
+Source: advocacy/prep/status-2026-09-17.md · advocacy/prep/angles.md ranked table · docs/handoff-corrections.md C10
+Routes to: advocacy-intake, and the video slate rewrite
+
+### [friction] project-hub's own regenerate script duplicates every reference section when round-tripped
+Symptom: after two regenerates the hub had `Reference: Deepgram`, `Reference: Home Assistant` and
+`Reference: Prior art` three times each, 69 tiles where there should have been 50. The page still
+rendered and still looked plausible, which is why it took a tile count to notice.
+Cause: `regenerate.py --tiles FILE` takes the authored tiles, but the region it writes them into,
+`<!-- TILES START -->` to `<!-- TILES END -->`, also contains the reference sections it generates
+from `hub.yml`. So lifting that region out of an existing `index.html` and passing it back as
+`--tiles` feeds the generated sections in as if they were authored, and the next run appends a
+fresh copy below them.
+Fix: cut the extracted region at the first `<h2>Reference:` before passing it as `--tiles`. The
+default no-argument path does not hit this, because it lifts and replaces in the same position.
+Worth fixing in the skill: either write the reference sections outside the TILES markers, or have
+`--tiles` strip anything from the first `Reference:` heading down.
+Source: .claude/skills/project-hub/scripts/regenerate.py · 69 tiles before, 50 after
+Routes to: a fix in the project-hub skill, and a gotchas post about round-tripping generated files

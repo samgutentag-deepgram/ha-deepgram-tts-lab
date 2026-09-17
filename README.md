@@ -4,8 +4,15 @@
 >
 > No release, no tag, not in the HACS default store, no support of any kind. A real Home
 > Assistant 2026.9.2 has spoken through a Sonos Beam with this installed, and that is about as
-> far as it goes. The Assist pipeline, the options flow, and anything at all on a Raspberry Pi
-> have never been run once. Accurate on 2026-09-17 and stale soon after.
+> far as it goes.
+>
+> **Streaming is on and has never been run against a real Assist pipeline.** Defining
+> `async_stream_tts_audio` is itself Home Assistant's streaming opt-in, so every Assist response
+> goes down the websocket. Direct `tts.speak` calls still use the batch path, which is the
+> half that's been heard out loud. The options flow, the Sonos audio clip path under streaming,
+> and anything at all on a Raspberry Pi have never been run once.
+>
+> Accurate on 2026-09-17 and stale soon after.
 
 Makes [Deepgram Flux TTS](https://developers.deepgram.com) the voice of a Home Assistant voice
 assistant. 36 Flux voices, all English, `flux-haley-en` by default.
@@ -104,8 +111,9 @@ default, so a morning briefing that says the same thing every day is billed once
 picks up from. A rebuild and not a git fork, so the two share no commits, but that integration
 proved people wanted a Deepgram TTS entity, and its config flow shape is what this one's is
 modeled on. New here: Flux as the primary path, per-request language resolution across both model
-families, typed auth and connection errors a caller can tell apart, and a streaming client held
-back on a branch until it's been measured on real hardware. Thanks for doing it first.
+families, typed auth and connection errors a caller can tell apart, and a Flux websocket
+streaming path that reaches first audio in 314 ms against 3394 ms for batch on the same machine.
+Thanks for doing it first.
 
 Deepgram's [Flux TTS](https://developers.deepgram.com) and
 [Aura-2](https://developers.deepgram.com) do the actual speaking.

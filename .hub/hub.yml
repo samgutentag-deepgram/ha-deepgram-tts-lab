@@ -25,8 +25,13 @@ asana:                          # written once by init. project-hub reads this b
 #   Also cleaned up: the first two tasks landed in My Tasks instead of the project, because
 #   asana_create_task takes `project_id` and not `projects`. Both were deleted and recreated.
 
-# No public_repo key. This project has not flipped, so every tile here is internal.
-# Flip target when it does: samgutentag-deepgram/ha-deepgram-tts
+# Deliberately no public_repo key, even though the repo is public as of 2026-09-17.
+#   That key means "the stripped snapshot exists". It does not. Sam pushed the lab repo itself
+#   to samgutentag-deepgram/ha-deepgram-tts-lab and flipped it public by hand, with .hub/ and
+#   advocacy/ still tracked, so internal sharing is a URL instead of a screenshot. Setting
+#   public_repo here would tell a future session the flip happened and the strip was done.
+#   Neither is true. See the 2026-09-17 ledger entry.
+# The real flip target, when this is installable: samgutentag-deepgram/ha-deepgram-tts
 
 reference:
   Deepgram:
@@ -41,7 +46,7 @@ reference:
       desc: Public, no auth. 102 TTS entries, 90 aura-2 plus 12 legacy aura. Zero Flux.
     - name: 🔑 Deepgram console
       url: https://console.deepgram.com
-      desc: Where the API key comes from. There is no key on this machine yet.
+      desc: Where the API key comes from. A real key has been used against both speak endpoints.
   Home Assistant:
     - name: 📗 TTS entity docs
       url: https://developers.home-assistant.io/docs/core/entity/text-to-speech
@@ -55,6 +60,10 @@ reference:
     - name: 🔊 Voice Preview Edition
       url: https://www.home-assistant.io/voice-pe/
       desc: The reference voice hardware. See the bill of materials for whether it is the right buy.
+  This project:
+    - name: 📁 ha-deepgram-tts-lab on GitHub
+      url: https://github.com/samgutentag-deepgram/ha-deepgram-tts-lab
+      desc: Public since 2026-09-17, ledger and advocacy drafts included. Not the flipped snapshot.
   Prior art:
     - name: 🔀 alceasan/ha-deepgram-tts
       url: https://github.com/alceasan/ha-deepgram-tts
